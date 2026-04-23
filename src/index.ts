@@ -1,31 +1,17 @@
-import { serve } from '@hono/node-server';
-
 import { createApp } from './app.js';
 import { runMigrations } from './db/migrate.js';
-import { loadRuntimeConfig } from './lib/config.js';
+import {
+  buildDatabaseConnectionOptions,
+  loadRuntimeConfig,
+} from './lib/config.js';
 import { openDatabase } from './lib/database.js';
 
 const config = loadRuntimeConfig();
-const database = openDatabase({
-  databasePath: config.databasePath,
-  useRemoteDb: config.useRemoteDb,
-  ...(config.tursoAuthToken ? { tursoAuthToken: config.tursoAuthToken } : {}),
-  ...(config.tursoDatabaseUrl
-    ? { tursoDatabaseUrl: config.tursoDatabaseUrl }
-    : {}),
-});
+const database = openDatabase(buildDatabaseConnectionOptions(config));
 await runMigrations(database);
 
-serve(
-  {
-    fetch: createApp(database, {
-      ...(config.apiReadKey ? { apiReadKey: config.apiReadKey } : {}),
-    }).fetch,
-    port: config.port,
-  },
-  (info) => {
-    console.log(
-      `Discogs collection API listening on http://localhost:${info.port}`,
-    );
-  },
-);
+const app = createApp(database, {
+  ...(config.apiReadKey ? { apiReadKey: config.apiReadKey } : {}),
+});
+
+export default app;

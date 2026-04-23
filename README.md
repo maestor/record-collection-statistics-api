@@ -29,6 +29,7 @@ Local-first backend for importing a Discogs collection into SQLite and serving a
 - `npm run import:discogs` syncs the Discogs collection and refreshes stale release details
 - The importer prints progress to `stderr` during long runs and keeps the final JSON summary on `stdout`
 - `npm run dev` starts the local read-only API
+- `vercel dev` runs the same app through Vercel's local runtime when you want to test the deployment shape
 - `npm run test` runs integration-style tests
 - `npm run verify` runs typecheck, lint, and tests
 
@@ -80,3 +81,36 @@ The OpenAPI document is exposed at `GET /openapi.json` for consumers that want t
 ## Future Direction
 - Keep repository and SQL boundaries small enough to support local SQLite and remote Turso through the same repository API.
 - Keep handlers stateless so deployment to Vercel is straightforward when the project is ready.
+
+## Vercel Deployment
+This repo now uses a Vercel-friendly `src/index.ts` that default-exports the Hono app, while local development uses `src/server.ts`.
+
+Based on the current official Hono and Vercel docs:
+
+- Hono's Vercel guide says a Vercel deployment can use a default-exported Hono app from `index.ts` or `src/index.ts`.
+- Vercel's Node.js runtime docs say TypeScript functions are supported and Node.js `24.x` is currently available.
+
+What to do when you deploy:
+
+1. Create a Vercel project from this repository.
+2. Set these environment variables in Vercel:
+- `DATABASE_PATH=var/discogs.sqlite`
+- `USE_REMOTE_DB=true`
+- `TURSO_DATABASE_URL`
+- `TURSO_AUTH_TOKEN`
+- `API_READ_KEY`
+3. Do not set `DISCOGS_ACCESS_TOKEN` unless you intentionally want importer scripts available in that environment.
+4. Make sure the project uses Node.js `24.x`. This repo already declares `>=24.0.0`, and Vercel currently supports `24.x`.
+5. Deploy, then verify `/health`, `/openapi.json`, and one filtered `/records` request.
+
+Suggested rollout order:
+
+1. Import locally into SQLite.
+2. Run `npm run db:copy-to-remote -- --force`.
+3. Switch `USE_REMOTE_DB=true` in Vercel.
+4. Deploy and smoke-test the read API.
+
+Sources:
+- https://hono.dev/docs/getting-started/vercel
+- https://vercel.com/docs/functions/runtimes/node-js
+- https://vercel.com/docs/functions/runtimes/node-js/node-js-versions

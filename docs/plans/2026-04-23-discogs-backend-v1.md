@@ -95,8 +95,8 @@ Create a local-first Discogs collection backend that:
 - Batch 5: completed
 - Batch 6: completed
 - Batch 7: completed
-- Batch 8: in progress
-- Batch 9: pending
+- Batch 8: completed
+- Batch 9: completed
 
 ## Public Commands
 - `npm run db:migrate`

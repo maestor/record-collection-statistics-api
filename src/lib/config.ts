@@ -1,5 +1,7 @@
 import { config as loadDotEnv } from 'dotenv';
 
+import type { DatabaseConnectionOptions } from './database.js';
+
 loadDotEnv();
 
 export interface RuntimeConfig {
@@ -102,5 +104,18 @@ export function loadDiscogsImportConfig(): DiscogsImportConfig {
     ),
     releaseTtlDays: readIntegerEnv('DISCOGS_RELEASE_TTL_DAYS', 30),
     minIntervalMs: readIntegerEnv('DISCOGS_MIN_INTERVAL_MS', 1100),
+  };
+}
+
+export function buildDatabaseConnectionOptions(
+  config: RuntimeConfig,
+): DatabaseConnectionOptions {
+  return {
+    databasePath: config.databasePath,
+    useRemoteDb: config.useRemoteDb,
+    ...(config.tursoAuthToken ? { tursoAuthToken: config.tursoAuthToken } : {}),
+    ...(config.tursoDatabaseUrl
+      ? { tursoDatabaseUrl: config.tursoDatabaseUrl }
+      : {}),
   };
 }

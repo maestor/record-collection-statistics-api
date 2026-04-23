@@ -4,19 +4,15 @@ import {
   DiscogsImporter,
   type DiscogsImportProgressEvent,
 } from '../importer/discogs-importer.js';
-import { loadDiscogsImportConfig } from '../lib/config.js';
+import {
+  buildDatabaseConnectionOptions,
+  loadDiscogsImportConfig,
+} from '../lib/config.js';
 import { openDatabase } from '../lib/database.js';
 import { ImportRepository } from '../repositories/import-repository.js';
 
 const config = loadDiscogsImportConfig();
-const database = openDatabase({
-  databasePath: config.databasePath,
-  useRemoteDb: config.useRemoteDb,
-  ...(config.tursoAuthToken ? { tursoAuthToken: config.tursoAuthToken } : {}),
-  ...(config.tursoDatabaseUrl
-    ? { tursoDatabaseUrl: config.tursoDatabaseUrl }
-    : {}),
-});
+const database = openDatabase(buildDatabaseConnectionOptions(config));
 await runMigrations(database);
 
 const fullRefresh = process.argv.includes('--full-refresh');
