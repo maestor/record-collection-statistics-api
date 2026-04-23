@@ -10,6 +10,7 @@ import {
   validateRecordsQueryKeys,
 } from './http/validation.js';
 import { createJsonCacheResponse } from './lib/http-cache.js';
+import { buildOpenApiDocument } from './openapi/spec.js';
 import { RecordsRepository } from './repositories/records-repository.js';
 
 export interface AppOptions {
@@ -110,6 +111,7 @@ export function createApp(
         },
         endpoints: {
           health: '/health',
+          openapi: '/openapi.json',
           filters: '/filters?limit=25',
           records: '/records',
           recordDetail: '/records/:releaseId',
@@ -158,6 +160,14 @@ export function createApp(
         ifNoneMatch: context.req.header('if-none-match') ?? null,
       },
     );
+  });
+
+  app.get('/openapi.json', (context) => {
+    validateAllowedQueryKeys(context.req.query(), new Set(), '/openapi.json');
+
+    return createJsonCacheResponse(buildOpenApiDocument(), {
+      ifNoneMatch: context.req.header('if-none-match') ?? null,
+    });
   });
 
   app.get('/health', (context) => {

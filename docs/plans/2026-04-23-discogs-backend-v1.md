@@ -94,7 +94,7 @@ Create a local-first Discogs collection backend that:
 - Batch 4: completed
 - Batch 5: completed
 - Batch 6: in progress
-- Batch 7: pending
+- Batch 7: in progress
 - Batch 8: pending
 - Batch 9: pending
 

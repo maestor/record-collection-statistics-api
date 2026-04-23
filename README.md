@@ -48,6 +48,7 @@ Localhost requests bypass API-key checks. Non-local requests must send either `x
 
 ## API Overview
 - `GET /health`
+- `GET /openapi.json`
 - `GET /filters`
 - `GET /records`
 - `GET /records/:releaseId`
@@ -56,6 +57,7 @@ Localhost requests bypass API-key checks. Non-local requests must send either `x
 
 The API returns cache headers and ETags for read responses. Validation errors return `400`.
 When `API_READ_KEY` is configured, non-local requests require an API key and return `401` if it is missing or invalid.
+The OpenAPI document is exposed at `GET /openapi.json` for consumers that want to generate client types or SDKs on their own side.
 
 ## Import Strategy
 - Sync collection rows from Discogs folder `0` in pages of `100`

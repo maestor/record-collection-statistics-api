@@ -65,6 +65,7 @@ test('GET / exposes API discovery details', async () => {
       endpoints: {
         filters: string;
         health: string;
+        openapi: string;
         recordDetail: string;
         records: string;
         statsBreakdown: string;
@@ -80,9 +81,45 @@ test('GET / exposes API discovery details', async () => {
     assert.equal(payload.capabilities.localBypassAuth, true);
     assert.equal(payload.capabilities.remoteApiKeyAuth, true);
     assert.equal(payload.endpoints.statsDashboard, '/stats/dashboard?limit=10');
+    assert.equal(payload.endpoints.openapi, '/openapi.json');
     assert.ok(payload.breakdownDimensions.includes('artist'));
 
     const invalidResponse = await app.request('/?limit=1');
+    assert.equal(invalidResponse.status, 400);
+  } finally {
+    seeded.cleanup();
+  }
+});
+
+test('GET /openapi.json exposes the OpenAPI document', async () => {
+  const seeded = await seedFixtureImport({
+    now: () => new Date('2026-04-23T10:00:00.000Z'),
+  });
+
+  try {
+    const app = createApp(seeded.database);
+    const response = await app.request('/openapi.json');
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('cache-control') ?? '', /max-age=60/);
+
+    const payload = (await response.json()) as {
+      components: {
+        schemas: Record<string, unknown>;
+      };
+      info: {
+        title: string;
+      };
+      openapi: string;
+      paths: Record<string, unknown>;
+    };
+
+    assert.equal(payload.openapi, '3.1.0');
+    assert.equal(payload.info.title, 'Record Collection Statistics API');
+    assert.ok(payload.paths['/records']);
+    assert.ok(payload.paths['/openapi.json']);
+    assert.ok(payload.components.schemas.RecordDetail);
+
+    const invalidResponse = await app.request('/openapi.json?limit=1');
     assert.equal(invalidResponse.status, 400);
   } finally {
     seeded.cleanup();
