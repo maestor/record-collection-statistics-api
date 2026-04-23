@@ -121,7 +121,12 @@ function parsePositiveInteger(
     return fallback;
   }
 
-  const parsed = Number.parseInt(value, 10);
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    throw new Error(`${label} must be a positive integer.`);
+  }
+
+  const parsed = Number.parseInt(trimmed, 10);
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw new Error(`${label} must be a positive integer.`);
   }
@@ -137,7 +142,12 @@ function parseOptionalInteger(
     return undefined;
   }
 
-  const parsed = Number.parseInt(value, 10);
+  const trimmed = value.trim();
+  if (!/^-?\d+$/.test(trimmed)) {
+    throw new Error(`${label} must be an integer.`);
+  }
+
+  const parsed = Number.parseInt(trimmed, 10);
   if (!Number.isInteger(parsed)) {
     throw new Error(`${label} must be an integer.`);
   }
@@ -229,7 +239,12 @@ export function parseRecordsQuery(
 }
 
 export function parseReleaseId(value: string): number {
-  const parsed = Number.parseInt(value, 10);
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    throw new Error('releaseId must be a positive integer.');
+  }
+
+  const parsed = Number.parseInt(trimmed, 10);
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw new Error('releaseId must be a positive integer.');
   }

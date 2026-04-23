@@ -16,8 +16,10 @@
 
 ## Quality
 - Run `npm run verify` after meaningful backend changes.
+- Run `npm run test:mutation` for changes that materially affect validation, importer mapping, or other core logic covered by the mutation scope.
 - Add integration fixtures for Discogs payload changes before changing importer mapping logic.
 - Preserve backwards-compatible response shapes unless the user asks for a breaking change.
+- Keep `npm run verify` fast for routine development, and use `npm run test:mutation` separately when you want the stronger mutation-testing signal.
 
 ## Commit Strategy
 - Commit in reasonable implementation batches instead of waiting until the very end.

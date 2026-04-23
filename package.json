@@ -13,6 +13,7 @@
     "db:copy-to-remote": "node --import tsx src/cli/db-copy-to-remote.ts",
     "import:discogs": "node --import tsx src/cli/import-discogs.ts",
     "test": "node --import tsx --test",
+    "test:mutation": "stryker run",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "format": "biome format --write .",
@@ -26,6 +27,9 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.13",
+    "@stryker-mutator/core": "^9.6.1",
+    "@stryker-mutator/tap-runner": "^9.6.1",
+    "@stryker-mutator/typescript-checker": "^9.6.1",
     "@types/node": "^25.6.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
