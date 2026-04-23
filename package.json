@@ -1,0 +1,33 @@
+{
+  "name": "record-collection-statistics-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-first Discogs collection importer and read-only statistics API.",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "node --watch --import tsx src/index.ts",
+    "db:migrate": "node --import tsx src/cli/db-migrate.ts",
+    "import:discogs": "node --import tsx src/cli/import-discogs.ts",
+    "test": "node --import tsx --test",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "verify": "npm run typecheck && npm run lint && npm run test"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.0.0",
+    "better-sqlite3": "^12.9.0",
+    "dotenv": "^17.4.2",
+    "hono": "^4.12.14"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.13",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.6.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

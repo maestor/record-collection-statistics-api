@@ -1,0 +1,120 @@
+{
+  "pagination": {
+    "page": 1,
+    "pages": 2,
+    "per_page": 100,
+    "items": 3
+  },
+  "releases": [
+    {
+      "id": 101,
+      "instance_id": 1001,
+      "folder_id": 0,
+      "date_added": "2024-01-10T10:00:00-05:00",
+      "rating": 4,
+      "notes": [
+        {
+          "field_id": 1,
+          "value": "Near Mint (NM or M-)"
+        },
+        {
+          "field_id": 2,
+          "value": "Very Good Plus (VG+)"
+        }
+      ],
+      "basic_information": {
+        "id": 101,
+        "master_id": 10001,
+        "master_url": "https://api.discogs.com/masters/10001",
+        "resource_url": "https://api.discogs.com/releases/101",
+        "thumb": "https://example.test/release-101-thumb.jpg",
+        "cover_image": "https://example.test/release-101-cover.jpg",
+        "title": "Northern Lights",
+        "year": 1999,
+        "formats": [
+          {
+            "name": "CD",
+            "qty": "1",
+            "descriptions": ["Album"]
+          }
+        ],
+        "labels": [
+          {
+            "name": "Aurora Audio",
+            "catno": "AA-101",
+            "entity_type": "1",
+            "entity_type_name": "Label",
+            "id": 501,
+            "resource_url": "https://api.discogs.com/labels/501"
+          }
+        ],
+        "artists": [
+          {
+            "name": "Alpha Artist",
+            "anv": "",
+            "join": "",
+            "role": "",
+            "tracks": "",
+            "id": 301,
+            "resource_url": "https://api.discogs.com/artists/301"
+          }
+        ],
+        "genres": ["Rock"],
+        "styles": ["Indie Rock"]
+      }
+    },
+    {
+      "id": 202,
+      "instance_id": 2001,
+      "folder_id": 0,
+      "date_added": "2024-02-11T15:30:00+02:00",
+      "rating": 5,
+      "notes": [
+        {
+          "field_id": 3,
+          "value": "Signed sleeve"
+        }
+      ],
+      "basic_information": {
+        "id": 202,
+        "master_id": 20002,
+        "master_url": "https://api.discogs.com/masters/20002",
+        "resource_url": "https://api.discogs.com/releases/202",
+        "thumb": "https://example.test/release-202-thumb.jpg",
+        "cover_image": "https://example.test/release-202-cover.jpg",
+        "title": "Moonlit Session",
+        "year": 2005,
+        "formats": [
+          {
+            "name": "Vinyl",
+            "qty": "2",
+            "descriptions": ["LP", "Album"]
+          }
+        ],
+        "labels": [
+          {
+            "name": "Moon Records",
+            "catno": "MR-202",
+            "entity_type": "1",
+            "entity_type_name": "Label",
+            "id": 502,
+            "resource_url": "https://api.discogs.com/labels/502"
+          }
+        ],
+        "artists": [
+          {
+            "name": "Beta Ensemble",
+            "anv": "",
+            "join": "",
+            "role": "",
+            "tracks": "",
+            "id": 302,
+            "resource_url": "https://api.discogs.com/artists/302"
+          }
+        ],
+        "genres": ["Jazz"],
+        "styles": ["Fusion"]
+      }
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+{
+  "id": 202,
+  "status": "Accepted",
+  "year": 2005,
+  "resource_url": "https://api.discogs.com/releases/202",
+  "uri": "https://www.discogs.com/release/202-moonlit-session",
+  "artists": [
+    {
+      "name": "Beta Ensemble",
+      "anv": "",
+      "join": "",
+      "role": "",
+      "tracks": "",
+      "id": 302,
+      "resource_url": "https://api.discogs.com/artists/302",
+      "thumbnail_url": "https://example.test/artist-302.jpg"
+    }
+  ],
+  "artists_sort": "Beta Ensemble",
+  "labels": [
+    {
+      "name": "Moon Records",
+      "catno": "MR-202",
+      "entity_type": "1",
+      "entity_type_name": "Label",
+      "id": 502,
+      "resource_url": "https://api.discogs.com/labels/502",
+      "thumbnail_url": "https://example.test/label-502.jpg"
+    }
+  ],
+  "formats": [
+    {
+      "name": "Vinyl",
+      "qty": "2",
+      "descriptions": ["LP", "Album"]
+    }
+  ],
+  "community": {
+    "have": 43,
+    "want": 17,
+    "rating": {
+      "count": 9,
+      "average": 4.2
+    },
+    "data_quality": "Needs Vote"
+  },
+  "master_id": 20002,
+  "title": "Moonlit Session",
+  "country": "Sweden",
+  "released": "2005",
+  "data_quality": "Needs Vote",
+  "identifiers": [
+    {
+      "type": "Matrix / Runout",
+      "value": "MR-202-A",
+      "description": ""
+    }
+  ],
+  "genres": ["Jazz"],
+  "styles": ["Fusion"],
+  "tracklist": [
+    {
+      "position": "A1",
+      "type_": "track",
+      "title": "Late Departure",
+      "duration": "6:11"
+    }
+  ],
+  "images": [
+    {
+      "type": "primary",
+      "uri": "https://example.test/release-202-cover.jpg",
+      "resource_url": "https://example.test/release-202-cover.jpg",
+      "uri150": "https://example.test/release-202-cover-150.jpg",
+      "width": 600,
+      "height": 600
+    }
+  ],
+  "thumb": "https://example.test/release-202-thumb.jpg",
+  "lowest_price": 20.0,
+  "num_for_sale": 1
+}

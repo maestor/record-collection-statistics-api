@@ -1,0 +1,88 @@
+{
+  "id": 101,
+  "status": "Accepted",
+  "year": 1999,
+  "resource_url": "https://api.discogs.com/releases/101",
+  "uri": "https://www.discogs.com/release/101-northern-lights",
+  "artists": [
+    {
+      "name": "Alpha Artist",
+      "anv": "",
+      "join": "",
+      "role": "",
+      "tracks": "",
+      "id": 301,
+      "resource_url": "https://api.discogs.com/artists/301",
+      "thumbnail_url": "https://example.test/artist-301.jpg"
+    }
+  ],
+  "artists_sort": "Alpha Artist",
+  "labels": [
+    {
+      "name": "Aurora Audio",
+      "catno": "AA-101",
+      "entity_type": "1",
+      "entity_type_name": "Label",
+      "id": 501,
+      "resource_url": "https://api.discogs.com/labels/501",
+      "thumbnail_url": "https://example.test/label-501.jpg"
+    }
+  ],
+  "formats": [
+    {
+      "name": "CD",
+      "qty": "1",
+      "descriptions": ["Album"]
+    }
+  ],
+  "community": {
+    "have": 85,
+    "want": 12,
+    "rating": {
+      "count": 20,
+      "average": 4.7
+    },
+    "data_quality": "Correct"
+  },
+  "master_id": 10001,
+  "title": "Northern Lights",
+  "country": "Finland",
+  "released": "1999-10-01",
+  "data_quality": "Correct",
+  "identifiers": [
+    {
+      "type": "Barcode",
+      "value": "1234567890123",
+      "description": "Text"
+    }
+  ],
+  "genres": ["Rock"],
+  "styles": ["Indie Rock"],
+  "tracklist": [
+    {
+      "position": "A1",
+      "type_": "track",
+      "title": "Polar Night",
+      "duration": "4:05"
+    },
+    {
+      "position": "A2",
+      "type_": "track",
+      "title": "Morning Snow",
+      "duration": "3:45"
+    }
+  ],
+  "images": [
+    {
+      "type": "primary",
+      "uri": "https://example.test/release-101-cover.jpg",
+      "resource_url": "https://example.test/release-101-cover.jpg",
+      "uri150": "https://example.test/release-101-cover-150.jpg",
+      "width": 600,
+      "height": 600
+    }
+  ],
+  "thumb": "https://example.test/release-101-thumb.jpg",
+  "lowest_price": 12.5,
+  "num_for_sale": 2
+}

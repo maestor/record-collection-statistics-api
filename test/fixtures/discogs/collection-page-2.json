@@ -1,0 +1,63 @@
+{
+  "pagination": {
+    "page": 2,
+    "pages": 2,
+    "per_page": 100,
+    "items": 3
+  },
+  "releases": [
+    {
+      "id": 101,
+      "instance_id": 1002,
+      "folder_id": 0,
+      "date_added": "2024-03-05T00:00:00Z",
+      "rating": 0,
+      "notes": [
+        {
+          "field_id": 1,
+          "value": "Very Good Plus (VG+)"
+        }
+      ],
+      "basic_information": {
+        "id": 101,
+        "master_id": 10001,
+        "master_url": "https://api.discogs.com/masters/10001",
+        "resource_url": "https://api.discogs.com/releases/101",
+        "thumb": "https://example.test/release-101-thumb.jpg",
+        "cover_image": "https://example.test/release-101-cover.jpg",
+        "title": "Northern Lights",
+        "year": 1999,
+        "formats": [
+          {
+            "name": "CD",
+            "qty": "1",
+            "descriptions": ["Album"]
+          }
+        ],
+        "labels": [
+          {
+            "name": "Aurora Audio",
+            "catno": "AA-101",
+            "entity_type": "1",
+            "entity_type_name": "Label",
+            "id": 501,
+            "resource_url": "https://api.discogs.com/labels/501"
+          }
+        ],
+        "artists": [
+          {
+            "name": "Alpha Artist",
+            "anv": "",
+            "join": "",
+            "role": "",
+            "tracks": "",
+            "id": 301,
+            "resource_url": "https://api.discogs.com/artists/301"
+          }
+        ],
+        "genres": ["Rock"],
+        "styles": ["Indie Rock"]
+      }
+    }
+  ]
+}
