@@ -5,6 +5,9 @@ import {
   parseFacetLimit,
   parseRecordsQuery,
   parseReleaseId,
+  validateAllowedQueryKeys,
+  validateLimitOnlyQueryKeys,
+  validateRecordsQueryKeys,
 } from './http/validation.js';
 import { createJsonCacheResponse } from './lib/http-cache.js';
 import { RecordsRepository } from './repositories/records-repository.js';
@@ -14,7 +17,9 @@ export function createApp(database: Database.Database): Hono {
   const recordsRepository = new RecordsRepository(database);
 
   app.onError((error, context) => {
-    const status = /must be|cannot be/.test(error.message) ? 400 : 500;
+    const status = /must be|cannot be|does not support/.test(error.message)
+      ? 400
+      : 500;
     return context.json(
       {
         error: error.message,
@@ -24,6 +29,8 @@ export function createApp(database: Database.Database): Hono {
   });
 
   app.get('/', (context) => {
+    validateAllowedQueryKeys(context.req.query(), new Set(), '/');
+
     return createJsonCacheResponse(
       {
         service: 'record-collection-statistics-api',
@@ -85,6 +92,8 @@ export function createApp(database: Database.Database): Hono {
   });
 
   app.get('/health', (context) => {
+    validateAllowedQueryKeys(context.req.query(), new Set(), '/health');
+
     const snapshot = recordsRepository.getHealthSnapshot();
     return createJsonCacheResponse(
       {
@@ -102,7 +111,9 @@ export function createApp(database: Database.Database): Hono {
   });
 
   app.get('/records', (context) => {
-    const query = parseRecordsQuery(context.req.query());
+    const rawQuery = context.req.query();
+    validateRecordsQueryKeys(rawQuery);
+    const query = parseRecordsQuery(rawQuery);
     const total = recordsRepository.countRecords(query);
     const items = recordsRepository.listRecords(query);
 
@@ -138,6 +149,12 @@ export function createApp(database: Database.Database): Hono {
   });
 
   app.get('/records/:releaseId', (context) => {
+    validateAllowedQueryKeys(
+      context.req.query(),
+      new Set(),
+      '/records/:releaseId',
+    );
+
     const releaseId = parseReleaseId(context.req.param('releaseId'));
     const record = recordsRepository.getRecordDetail(releaseId);
     if (!record) {
@@ -160,6 +177,8 @@ export function createApp(database: Database.Database): Hono {
   });
 
   app.get('/stats/summary', (context) => {
+    validateAllowedQueryKeys(context.req.query(), new Set(), '/stats/summary');
+
     return createJsonCacheResponse(
       {
         data: recordsRepository.getStatsSummary(),
@@ -171,7 +190,9 @@ export function createApp(database: Database.Database): Hono {
   });
 
   app.get('/stats/dashboard', (context) => {
-    const limit = parseFacetLimit(context.req.query('limit'));
+    const rawQuery = context.req.query();
+    validateLimitOnlyQueryKeys(rawQuery, '/stats/dashboard');
+    const limit = parseFacetLimit(rawQuery.limit);
 
     return createJsonCacheResponse(
       {
@@ -187,7 +208,9 @@ export function createApp(database: Database.Database): Hono {
   });
 
   app.get('/filters', (context) => {
-    const limit = parseFacetLimit(context.req.query('limit'));
+    const rawQuery = context.req.query();
+    validateLimitOnlyQueryKeys(rawQuery, '/filters');
+    const limit = parseFacetLimit(rawQuery.limit);
 
     return createJsonCacheResponse(
       {
@@ -203,6 +226,12 @@ export function createApp(database: Database.Database): Hono {
   });
 
   app.get('/stats/breakdowns/:dimension', (context) => {
+    validateAllowedQueryKeys(
+      context.req.query(),
+      new Set(),
+      '/stats/breakdowns/:dimension',
+    );
+
     const dimension = parseBreakdownDimension(context.req.param('dimension'));
     return createJsonCacheResponse(
       {

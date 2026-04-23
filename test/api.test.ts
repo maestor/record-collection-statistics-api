@@ -77,6 +77,9 @@ test('GET / exposes API discovery details', async () => {
     assert.equal(payload.capabilities.discogsOnRequestPath, false);
     assert.equal(payload.endpoints.statsDashboard, '/stats/dashboard?limit=10');
     assert.ok(payload.breakdownDimensions.includes('artist'));
+
+    const invalidResponse = await app.request('/?limit=1');
+    assert.equal(invalidResponse.status, 400);
   } finally {
     seeded.cleanup();
   }
@@ -103,6 +106,11 @@ test('GET /records validates sort options and supports artist filtering', async 
 
     const invalidResponse = await app.request('/records?sort=unknown');
     assert.equal(invalidResponse.status, 400);
+
+    const unknownQueryResponse = await app.request(
+      '/records?artist=Alpha%20Artist&artst=oops',
+    );
+    assert.equal(unknownQueryResponse.status, 400);
   } finally {
     seeded.cleanup();
   }
@@ -226,6 +234,11 @@ test('GET /stats/dashboard returns summary plus top breakdowns', async () => {
     assert.equal(payload.data.styles[0]?.value, 'Indie Rock');
     assert.equal(payload.data.countries[0]?.value, 'Finland');
     assert.equal(payload.data.addedYears[0]?.value, '2024');
+
+    const invalidResponse = await app.request(
+      '/stats/dashboard?limit=1&page=2',
+    );
+    assert.equal(invalidResponse.status, 400);
   } finally {
     seeded.cleanup();
   }
@@ -280,6 +293,11 @@ test('GET /filters returns available filter values and respects limit validation
 
     const invalidResponse = await app.request('/filters?limit=0');
     assert.equal(invalidResponse.status, 400);
+
+    const unknownQueryResponse = await app.request(
+      '/filters?limit=1&genre=Rock',
+    );
+    assert.equal(unknownQueryResponse.status, 400);
   } finally {
     seeded.cleanup();
   }
@@ -311,6 +329,9 @@ test('GET /health reports a successful local sync snapshot', async () => {
       payload.database.lastSuccessfulSyncAt,
       '2026-04-23T10:00:00.000Z',
     );
+
+    const invalidResponse = await app.request('/health?verbose=true');
+    assert.equal(invalidResponse.status, 400);
   } finally {
     seeded.cleanup();
   }

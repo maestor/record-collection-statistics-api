@@ -13,6 +13,69 @@ Create a local-first Discogs collection backend that:
 - Read-only HTTP API with pagination, filtering, and cache headers
 - Integration-focused tests and repository-level agent guidance
 
+## Batch Breakdown
+
+### Batch 1
+- Scaffold the TypeScript project, docs, configs, and repository guidance.
+- Add the baseline Node.js, TypeScript, Biome, and test tooling.
+
+### Batch 2
+- Implement SQLite migrations and the importer.
+- Sync Discogs collection items, custom collection fields, and release details into the local cache.
+- Add importer verification coverage.
+
+### Batch 3
+- Implement the core read-only API surface:
+- `GET /health`
+- `GET /records`
+- `GET /records/:releaseId`
+- `GET /stats/summary`
+- `GET /stats/breakdowns/:dimension`
+- `GET /records` supports:
+- `q`
+- `artist`
+- `label`
+- `genre`
+- `style`
+- `format`
+- `country`
+- `year_from`
+- `year_to`
+- `added_from`
+- `added_to`
+- `page`
+- `page_size`
+- `sort`
+- `order`
+- Allowed `sort` values for `GET /records`:
+- `date_added`
+- `release_year`
+- `artist`
+- `title`
+- `lowest_price`
+- Cap `page_size` at `100`.
+
+### Batch 4
+- Return response metadata for pagination and filters applied.
+- Expose community and marketplace fields on record detail.
+- Keep statistics focused on catalog and collection dimensions rather than valuation math.
+- Extend API usability with discovery-oriented read endpoints such as filter catalogs where helpful.
+
+### Batch 5
+- Lock in caching and security defaults:
+- Discogs is never called on the request path.
+- SQLite remains the cache boundary.
+- Add `ETag` plus `Cache-Control: private, max-age=60, stale-while-revalidate=300` to read endpoints.
+- Keep `DISCOGS_ACCESS_TOKEN` importer-only so the API process does not require it.
+- Validate all query params, reject unknown sort and dimension values, redact secrets from logs, and keep the API read-only.
+
+## Status
+- Batch 1: completed
+- Batch 2: completed
+- Batch 3: completed
+- Batch 4: completed
+- Batch 5: partially completed through current API defaults, but still tracked separately for hardening and review
+
 ## Public Commands
 - `npm run db:migrate`
 - `npm run import:discogs`

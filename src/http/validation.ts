@@ -41,6 +41,57 @@ export interface RecordsQueryInput {
   yearTo?: number;
 }
 
+const recordsQueryKeys = new Set([
+  'q',
+  'artist',
+  'label',
+  'genre',
+  'style',
+  'format',
+  'country',
+  'year_from',
+  'year_to',
+  'added_from',
+  'added_to',
+  'page',
+  'page_size',
+  'sort',
+  'order',
+]);
+
+const limitOnlyQueryKeys = new Set(['limit']);
+
+export function validateAllowedQueryKeys(
+  rawQuery: Record<string, string | undefined>,
+  allowedKeys: ReadonlySet<string>,
+  endpointName: string,
+): void {
+  const unknownKeys = Object.keys(rawQuery)
+    .filter((key) => !allowedKeys.has(key))
+    .sort();
+
+  if (unknownKeys.length === 0) {
+    return;
+  }
+
+  throw new Error(
+    `${endpointName} does not support query parameter(s): ${unknownKeys.join(', ')}`,
+  );
+}
+
+export function validateRecordsQueryKeys(
+  rawQuery: Record<string, string | undefined>,
+): void {
+  validateAllowedQueryKeys(rawQuery, recordsQueryKeys, '/records');
+}
+
+export function validateLimitOnlyQueryKeys(
+  rawQuery: Record<string, string | undefined>,
+  endpointName: string,
+): void {
+  validateAllowedQueryKeys(rawQuery, limitOnlyQueryKeys, endpointName);
+}
+
 export function parseFacetLimit(value: string | undefined): number {
   if (!value) {
     return 25;
