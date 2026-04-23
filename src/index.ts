@@ -11,7 +11,9 @@ runMigrations(database);
 
 serve(
   {
-    fetch: createApp(database).fetch,
+    fetch: createApp(database, {
+      ...(config.apiReadKey ? { apiReadKey: config.apiReadKey } : {}),
+    }).fetch,
     port: config.port,
   },
   (info) => {

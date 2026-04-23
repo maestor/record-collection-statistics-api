@@ -40,6 +40,12 @@ Copy `.env.example` into `.env` and set at least:
 
 The API itself does not require the Discogs token. Only the importer does.
 
+For non-local API access, set:
+
+- `API_READ_KEY`
+
+Localhost requests bypass API-key checks. Non-local requests must send either `x-api-key` or `Authorization: Bearer <key>`.
+
 ## API Overview
 - `GET /health`
 - `GET /filters`
@@ -49,6 +55,7 @@ The API itself does not require the Discogs token. Only the importer does.
 - `GET /stats/breakdowns/:dimension`
 
 The API returns cache headers and ETags for read responses. Validation errors return `400`.
+When `API_READ_KEY` is configured, non-local requests require an API key and return `401` if it is missing or invalid.
 
 ## Import Strategy
 - Sync collection rows from Discogs folder `0` in pages of `100`

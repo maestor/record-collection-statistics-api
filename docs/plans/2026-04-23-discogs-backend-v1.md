@@ -69,12 +69,34 @@ Create a local-first Discogs collection backend that:
 - Keep `DISCOGS_ACCESS_TOKEN` importer-only so the API process does not require it.
 - Validate all query params, reject unknown sort and dimension values, redact secrets from logs, and keep the API read-only.
 
+### Batch 6
+- Add lightweight API-key protection for non-local API access.
+- Bypass auth checks on localhost so local development stays frictionless.
+- Keep the mechanism simple enough for Vercel deployment without introducing a full auth system.
+
+### Batch 7
+- Add OpenAPI documentation for the API surface.
+- Make generated types available for consumer applications where practical.
+
+### Batch 8
+- Add Turso support behind `USE_REMOTE_DB`.
+- Use `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` when remote mode is enabled.
+- Support one-time bootstrap of remote data from the current local SQLite database so a full Discogs re-import is optional.
+
+### Batch 9
+- Document the Vercel deployment steps and any required config.
+- If code changes are needed for Vercel compatibility, implement them in this batch.
+
 ## Status
 - Batch 1: completed
 - Batch 2: completed
 - Batch 3: completed
 - Batch 4: completed
-- Batch 5: partially completed through current API defaults, but still tracked separately for hardening and review
+- Batch 5: completed
+- Batch 6: in progress
+- Batch 7: pending
+- Batch 8: pending
+- Batch 9: pending
 
 ## Public Commands
 - `npm run db:migrate`

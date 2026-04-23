@@ -58,7 +58,9 @@ test('GET / exposes API discovery details', async () => {
       capabilities: {
         discogsOnRequestPath: boolean;
         importerBackedCache: boolean;
+        localBypassAuth: boolean;
         readOnlyApi: boolean;
+        remoteApiKeyAuth: boolean;
       };
       endpoints: {
         filters: string;
@@ -75,11 +77,68 @@ test('GET / exposes API discovery details', async () => {
     assert.equal(payload.service, 'record-collection-statistics-api');
     assert.equal(payload.capabilities.readOnlyApi, true);
     assert.equal(payload.capabilities.discogsOnRequestPath, false);
+    assert.equal(payload.capabilities.localBypassAuth, true);
+    assert.equal(payload.capabilities.remoteApiKeyAuth, true);
     assert.equal(payload.endpoints.statsDashboard, '/stats/dashboard?limit=10');
     assert.ok(payload.breakdownDimensions.includes('artist'));
 
     const invalidResponse = await app.request('/?limit=1');
     assert.equal(invalidResponse.status, 400);
+  } finally {
+    seeded.cleanup();
+  }
+});
+
+test('non-local requests require API key while localhost stays open', async () => {
+  const seeded = await seedFixtureImport({
+    now: () => new Date('2026-04-23T10:00:00.000Z'),
+  });
+
+  try {
+    const app = createApp(seeded.database, {
+      apiReadKey: 'secret-read-key',
+    });
+
+    const localhostResponse = await app.request('/health');
+    assert.equal(localhostResponse.status, 200);
+
+    const missingKeyResponse = await app.request('https://example.com/health');
+    assert.equal(missingKeyResponse.status, 401);
+
+    const wrongKeyResponse = await app.request('https://example.com/health', {
+      headers: {
+        'x-api-key': 'wrong-key',
+      },
+    });
+    assert.equal(wrongKeyResponse.status, 401);
+
+    const xApiKeyResponse = await app.request('https://example.com/health', {
+      headers: {
+        'x-api-key': 'secret-read-key',
+      },
+    });
+    assert.equal(xApiKeyResponse.status, 200);
+
+    const bearerResponse = await app.request('https://example.com/health', {
+      headers: {
+        authorization: 'Bearer secret-read-key',
+      },
+    });
+    assert.equal(bearerResponse.status, 200);
+  } finally {
+    seeded.cleanup();
+  }
+});
+
+test('non-local requests fail closed when API key is not configured', async () => {
+  const seeded = await seedFixtureImport({
+    now: () => new Date('2026-04-23T10:00:00.000Z'),
+  });
+
+  try {
+    const app = createApp(seeded.database);
+    const response = await app.request('https://example.com/health');
+    assert.equal(response.status, 503);
   } finally {
     seeded.cleanup();
   }

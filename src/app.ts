@@ -12,7 +12,43 @@ import {
 import { createJsonCacheResponse } from './lib/http-cache.js';
 import { RecordsRepository } from './repositories/records-repository.js';
 
-export function createApp(database: Database.Database): Hono {
+export interface AppOptions {
+  apiReadKey?: string;
+}
+
+function isLocalHostname(hostname: string): boolean {
+  return (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '[::1]' ||
+    hostname === '::1'
+  );
+}
+
+function resolvePresentedApiKey(request: Request): string | null {
+  const xApiKey = request.headers.get('x-api-key')?.trim();
+  if (xApiKey) {
+    return xApiKey;
+  }
+
+  const authorization = request.headers.get('authorization')?.trim();
+  if (!authorization) {
+    return null;
+  }
+
+  const bearerPrefix = 'Bearer ';
+  if (!authorization.startsWith(bearerPrefix)) {
+    return null;
+  }
+
+  const bearerToken = authorization.slice(bearerPrefix.length).trim();
+  return bearerToken || null;
+}
+
+export function createApp(
+  database: Database.Database,
+  options: AppOptions = {},
+): Hono {
   const app = new Hono();
   const recordsRepository = new RecordsRepository(database);
 
@@ -28,6 +64,37 @@ export function createApp(database: Database.Database): Hono {
     );
   });
 
+  app.use('*', async (context, next) => {
+    const hostname = new URL(context.req.url).hostname;
+    if (isLocalHostname(hostname)) {
+      await next();
+      return;
+    }
+
+    if (!options.apiReadKey) {
+      return context.json(
+        {
+          error:
+            'Remote API access is disabled because API_READ_KEY is not configured.',
+        },
+        503,
+      );
+    }
+
+    const presentedApiKey = resolvePresentedApiKey(context.req.raw);
+    if (presentedApiKey !== options.apiReadKey) {
+      return context.json(
+        {
+          error:
+            'A valid API key is required for non-local requests. Provide x-api-key or Authorization: Bearer <key>.',
+        },
+        401,
+      );
+    }
+
+    await next();
+  });
+
   app.get('/', (context) => {
     validateAllowedQueryKeys(context.req.query(), new Set(), '/');
 
@@ -38,6 +105,8 @@ export function createApp(database: Database.Database): Hono {
           importerBackedCache: true,
           readOnlyApi: true,
           discogsOnRequestPath: false,
+          localBypassAuth: true,
+          remoteApiKeyAuth: true,
         },
         endpoints: {
           health: '/health',

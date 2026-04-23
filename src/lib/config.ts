@@ -3,6 +3,7 @@ import { config as loadDotEnv } from 'dotenv';
 loadDotEnv();
 
 export interface RuntimeConfig {
+  apiReadKey?: string;
   databasePath: string;
   port: number;
 }
@@ -48,7 +49,10 @@ function readIntegerEnv(name: string, defaultValue: number): number {
 }
 
 export function loadRuntimeConfig(): RuntimeConfig {
+  const apiReadKey = process.env.API_READ_KEY?.trim();
+
   return {
+    ...(apiReadKey ? { apiReadKey } : {}),
     databasePath: readStringEnv('DATABASE_PATH', 'var/discogs.sqlite'),
     port: readIntegerEnv('PORT', 3000),
   };
