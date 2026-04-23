@@ -1,4 +1,3 @@
-import type Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import {
   parseBreakdownDimension,
@@ -9,6 +8,7 @@ import {
   validateLimitOnlyQueryKeys,
   validateRecordsQueryKeys,
 } from './http/validation.js';
+import type { DatabaseClient } from './lib/database.js';
 import { createJsonCacheResponse } from './lib/http-cache.js';
 import { buildOpenApiDocument } from './openapi/spec.js';
 import { RecordsRepository } from './repositories/records-repository.js';
@@ -47,7 +47,7 @@ function resolvePresentedApiKey(request: Request): string | null {
 }
 
 export function createApp(
-  database: Database.Database,
+  database: DatabaseClient,
   options: AppOptions = {},
 ): Hono {
   const app = new Hono();
@@ -170,10 +170,10 @@ export function createApp(
     });
   });
 
-  app.get('/health', (context) => {
+  app.get('/health', async (context) => {
     validateAllowedQueryKeys(context.req.query(), new Set(), '/health');
 
-    const snapshot = recordsRepository.getHealthSnapshot();
+    const snapshot = await recordsRepository.getHealthSnapshot();
     return createJsonCacheResponse(
       {
         ok: true,
@@ -189,12 +189,12 @@ export function createApp(
     );
   });
 
-  app.get('/records', (context) => {
+  app.get('/records', async (context) => {
     const rawQuery = context.req.query();
     validateRecordsQueryKeys(rawQuery);
     const query = parseRecordsQuery(rawQuery);
-    const total = recordsRepository.countRecords(query);
-    const items = recordsRepository.listRecords(query);
+    const total = await recordsRepository.countRecords(query);
+    const items = await recordsRepository.listRecords(query);
 
     return createJsonCacheResponse(
       {
@@ -227,7 +227,7 @@ export function createApp(
     );
   });
 
-  app.get('/records/:releaseId', (context) => {
+  app.get('/records/:releaseId', async (context) => {
     validateAllowedQueryKeys(
       context.req.query(),
       new Set(),
@@ -235,7 +235,7 @@ export function createApp(
     );
 
     const releaseId = parseReleaseId(context.req.param('releaseId'));
-    const record = recordsRepository.getRecordDetail(releaseId);
+    const record = await recordsRepository.getRecordDetail(releaseId);
     if (!record) {
       return context.json(
         {
@@ -255,12 +255,12 @@ export function createApp(
     );
   });
 
-  app.get('/stats/summary', (context) => {
+  app.get('/stats/summary', async (context) => {
     validateAllowedQueryKeys(context.req.query(), new Set(), '/stats/summary');
 
     return createJsonCacheResponse(
       {
-        data: recordsRepository.getStatsSummary(),
+        data: await recordsRepository.getStatsSummary(),
       },
       {
         ifNoneMatch: context.req.header('if-none-match') ?? null,
@@ -268,14 +268,14 @@ export function createApp(
     );
   });
 
-  app.get('/stats/dashboard', (context) => {
+  app.get('/stats/dashboard', async (context) => {
     const rawQuery = context.req.query();
     validateLimitOnlyQueryKeys(rawQuery, '/stats/dashboard');
     const limit = parseFacetLimit(rawQuery.limit);
 
     return createJsonCacheResponse(
       {
-        data: recordsRepository.getDashboardStats(limit),
+        data: await recordsRepository.getDashboardStats(limit),
         meta: {
           limit,
         },
@@ -286,14 +286,14 @@ export function createApp(
     );
   });
 
-  app.get('/filters', (context) => {
+  app.get('/filters', async (context) => {
     const rawQuery = context.req.query();
     validateLimitOnlyQueryKeys(rawQuery, '/filters');
     const limit = parseFacetLimit(rawQuery.limit);
 
     return createJsonCacheResponse(
       {
-        data: recordsRepository.getFilterCatalog(limit),
+        data: await recordsRepository.getFilterCatalog(limit),
         meta: {
           limit,
         },
@@ -304,7 +304,7 @@ export function createApp(
     );
   });
 
-  app.get('/stats/breakdowns/:dimension', (context) => {
+  app.get('/stats/breakdowns/:dimension', async (context) => {
     validateAllowedQueryKeys(
       context.req.query(),
       new Set(),
@@ -314,7 +314,7 @@ export function createApp(
     const dimension = parseBreakdownDimension(context.req.param('dimension'));
     return createJsonCacheResponse(
       {
-        data: recordsRepository.getBreakdown(dimension),
+        data: await recordsRepository.getBreakdown(dimension),
         meta: {
           dimension,
         },

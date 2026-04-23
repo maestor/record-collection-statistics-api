@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "node --watch --import tsx src/index.ts",
     "db:migrate": "node --import tsx src/cli/db-migrate.ts",
+    "db:copy-to-remote": "node --import tsx src/cli/db-copy-to-remote.ts",
     "import:discogs": "node --import tsx src/cli/import-discogs.ts",
     "test": "node --import tsx --test",
     "typecheck": "tsc --noEmit",
@@ -19,13 +20,12 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.0.0",
-    "better-sqlite3": "^12.9.0",
+    "@libsql/client": "^0.17.3",
     "dotenv": "^17.4.2",
     "hono": "^4.12.14"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.13",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.6.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"

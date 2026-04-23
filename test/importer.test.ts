@@ -18,7 +18,7 @@ import {
 } from './helpers.js';
 
 test('DiscogsImporter imports fixture data and is idempotent for fresh releases', async () => {
-  const { database, cleanup } = createTempDatabase();
+  const { database, cleanup } = await createTempDatabase();
 
   try {
     const repository = new ImportRepository(database);
@@ -34,20 +34,16 @@ test('DiscogsImporter imports fixture data and is idempotent for fresh releases'
     assert.equal(firstRun.pagesProcessed, 2);
     assert.equal(firstRun.releasesRefreshed, 2);
 
-    const countsAfterFirstRun = database
-      .prepare(`
+    const countsAfterFirstRun = await database.queryOne<{
+      field_value_count: number;
+      item_count: number;
+      release_count: number;
+    }>(`
         SELECT
           (SELECT COUNT(*) FROM collection_items) AS item_count,
           (SELECT COUNT(*) FROM releases) AS release_count,
           (SELECT COUNT(*) FROM collection_item_field_values) AS field_value_count
-      `)
-      .get() as
-      | {
-          field_value_count: number;
-          item_count: number;
-          release_count: number;
-        }
-      | undefined;
+      `);
 
     assert.equal(countsAfterFirstRun?.item_count, 3);
     assert.equal(countsAfterFirstRun?.release_count, 2);
@@ -56,13 +52,14 @@ test('DiscogsImporter imports fixture data and is idempotent for fresh releases'
     const secondRun = await importer.run();
     assert.equal(secondRun.releasesRefreshed, 0);
 
-    const countsAfterSecondRun = database
-      .prepare(`
+    const countsAfterSecondRun = await database.queryOne<{
+      item_count: number;
+      release_count: number;
+    }>(`
         SELECT
           (SELECT COUNT(*) FROM collection_items) AS item_count,
           (SELECT COUNT(*) FROM releases) AS release_count
-      `)
-      .get() as { item_count: number; release_count: number } | undefined;
+      `);
 
     assert.equal(countsAfterSecondRun?.item_count, 3);
     assert.equal(countsAfterSecondRun?.release_count, 2);
@@ -72,7 +69,7 @@ test('DiscogsImporter imports fixture data and is idempotent for fresh releases'
 });
 
 test('DiscogsImporter refreshes stale releases and prunes removed collection rows after a successful sync', async () => {
-  const { database, cleanup } = createTempDatabase();
+  const { database, cleanup } = await createTempDatabase();
 
   try {
     const repository = new ImportRepository(database);
@@ -85,11 +82,9 @@ test('DiscogsImporter refreshes stale releases and prunes removed collection row
       repository,
     }).run();
 
-    database
-      .prepare(
-        "UPDATE releases SET stale_after = '2000-01-01T00:00:00.000Z' WHERE release_id = 101",
-      )
-      .run();
+    await database.execute(
+      "UPDATE releases SET stale_after = '2000-01-01T00:00:00.000Z' WHERE release_id = 101",
+    );
 
     const updatedRelease =
       readFixture<DiscogsReleaseDetail>('release-101.json');
@@ -118,15 +113,15 @@ test('DiscogsImporter refreshes stale releases and prunes removed collection row
 
     const remainingItemCount =
       (
-        database
-          .prepare('SELECT COUNT(*) AS count FROM collection_items')
-          .get() as { count: number } | undefined
+        await database.queryOne<{ count: number }>(
+          'SELECT COUNT(*) AS count FROM collection_items',
+        )
       )?.count ?? 0;
     const refreshedTitle =
       (
-        database
-          .prepare('SELECT title FROM releases WHERE release_id = 101')
-          .get() as { title: string } | undefined
+        await database.queryOne<{ title: string }>(
+          'SELECT title FROM releases WHERE release_id = 101',
+        )
       )?.title ?? '';
 
     assert.equal(remainingItemCount, 2);
@@ -137,7 +132,7 @@ test('DiscogsImporter refreshes stale releases and prunes removed collection row
 });
 
 test('DiscogsImporter emits progress events for collection sync and release enrichment', async () => {
-  const { database, cleanup } = createTempDatabase();
+  const { database, cleanup } = await createTempDatabase();
   const progressEvents: DiscogsImportProgressEvent[] = [];
 
   try {

@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import type Database from 'better-sqlite3';
+import type { DatabaseClient } from '../lib/database.js';
 
 const migrationsDirectory = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -12,8 +12,8 @@ const migrationsDirectory = join(
   'migrations',
 );
 
-export function runMigrations(database: Database.Database): void {
-  database.exec(`
+export async function runMigrations(database: DatabaseClient): Promise<void> {
+  await database.executeMultiple(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       name TEXT PRIMARY KEY,
       applied_at TEXT NOT NULL
@@ -22,11 +22,9 @@ export function runMigrations(database: Database.Database): void {
 
   const appliedNames = new Set<string>(
     (
-      database
-        .prepare('SELECT name FROM schema_migrations ORDER BY name')
-        .all() as Array<{
+      await database.queryAll<{
         name: string;
-      }>
+      }>('SELECT name FROM schema_migrations ORDER BY name')
     ).map((row) => row.name),
   );
 
@@ -34,19 +32,18 @@ export function runMigrations(database: Database.Database): void {
     .filter((file) => file.endsWith('.sql'))
     .sort();
 
-  const applyMigration = database.transaction((name: string, sql: string) => {
-    database.exec(sql);
-    database
-      .prepare('INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)')
-      .run(name, new Date().toISOString());
-  });
-
   for (const migrationFile of migrationFiles) {
     if (appliedNames.has(migrationFile)) {
       continue;
     }
 
     const sql = readFileSync(join(migrationsDirectory, migrationFile), 'utf8');
-    applyMigration(migrationFile, sql);
+    await database.withTransaction(async (transaction) => {
+      await transaction.executeMultiple(sql);
+      await transaction.execute(
+        'INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)',
+        [migrationFile, new Date().toISOString()],
+      );
+    });
   }
 }

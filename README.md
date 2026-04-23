@@ -21,10 +21,11 @@ Local-first backend for importing a Discogs collection into SQLite and serving a
 - Node.js 24+
 - TypeScript
 - Hono HTTP app
-- SQLite via `better-sqlite3`
+- libSQL client with local SQLite files today and Turso later
 
 ## Commands
-- `npm run db:migrate` applies SQL migrations to the local SQLite database
+- `npm run db:migrate` applies SQL migrations to the active database target
+- `npm run db:copy-to-remote -- --force` copies the current local SQLite data into Turso as a one-time bootstrap
 - `npm run import:discogs` syncs the Discogs collection and refreshes stale release details
 - The importer prints progress to `stderr` during long runs and keeps the final JSON summary on `stdout`
 - `npm run dev` starts the local read-only API
@@ -40,11 +41,17 @@ Copy `.env.example` into `.env` and set at least:
 
 The API itself does not require the Discogs token. Only the importer does.
 
+Database target selection:
+
+- `USE_REMOTE_DB=false` uses the local SQLite file at `DATABASE_PATH`
+- `USE_REMOTE_DB=true` uses Turso via `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`
+
 For non-local API access, set:
 
 - `API_READ_KEY`
 
 Localhost requests bypass API-key checks. Non-local requests must send either `x-api-key` or `Authorization: Bearer <key>`.
+The dedicated `db:copy-to-remote` command always copies from the local SQLite file to Turso and does not require `USE_REMOTE_DB=true`.
 
 ## API Overview
 - `GET /health`
@@ -71,5 +78,5 @@ The OpenAPI document is exposed at `GET /openapi.json` for consumers that want t
 - Mutation testing is planned after the first integration suite stabilizes.
 
 ## Future Direction
-- Keep repository and SQL boundaries small enough to support a later adapter for Turso/libSQL.
+- Keep repository and SQL boundaries small enough to support local SQLite and remote Turso through the same repository API.
 - Keep handlers stateless so deployment to Vercel is straightforward when the project is ready.

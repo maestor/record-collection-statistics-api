@@ -6,8 +6,15 @@ import { loadRuntimeConfig } from './lib/config.js';
 import { openDatabase } from './lib/database.js';
 
 const config = loadRuntimeConfig();
-const database = openDatabase(config.databasePath);
-runMigrations(database);
+const database = openDatabase({
+  databasePath: config.databasePath,
+  useRemoteDb: config.useRemoteDb,
+  ...(config.tursoAuthToken ? { tursoAuthToken: config.tursoAuthToken } : {}),
+  ...(config.tursoDatabaseUrl
+    ? { tursoDatabaseUrl: config.tursoDatabaseUrl }
+    : {}),
+});
+await runMigrations(database);
 
 serve(
   {

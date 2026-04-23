@@ -6,6 +6,9 @@ export interface RuntimeConfig {
   apiReadKey?: string;
   databasePath: string;
   port: number;
+  tursoAuthToken?: string;
+  tursoDatabaseUrl?: string;
+  useRemoteDb: boolean;
 }
 
 export interface DiscogsImportConfig extends RuntimeConfig {
@@ -48,13 +51,38 @@ function readIntegerEnv(name: string, defaultValue: number): number {
   return parsed;
 }
 
+function readBooleanEnv(name: string, defaultValue: boolean): boolean {
+  const raw = process.env[name];
+
+  if (!raw) {
+    return defaultValue;
+  }
+
+  const normalized = raw.trim().toLowerCase();
+  if (['true', '1', 'yes', 'on'].includes(normalized)) {
+    return true;
+  }
+
+  if (['false', '0', 'no', 'off'].includes(normalized)) {
+    return false;
+  }
+
+  throw new Error(`Environment variable ${name} must be a boolean.`);
+}
+
 export function loadRuntimeConfig(): RuntimeConfig {
   const apiReadKey = process.env.API_READ_KEY?.trim();
+  const tursoDatabaseUrl = process.env.TURSO_DATABASE_URL?.trim();
+  const tursoAuthToken = process.env.TURSO_AUTH_TOKEN?.trim();
+  const useRemoteDb = readBooleanEnv('USE_REMOTE_DB', false);
 
   return {
     ...(apiReadKey ? { apiReadKey } : {}),
+    ...(tursoDatabaseUrl ? { tursoDatabaseUrl } : {}),
+    ...(tursoAuthToken ? { tursoAuthToken } : {}),
     databasePath: readStringEnv('DATABASE_PATH', 'var/discogs.sqlite'),
     port: readIntegerEnv('PORT', 3000),
+    useRemoteDb,
   };
 }
 

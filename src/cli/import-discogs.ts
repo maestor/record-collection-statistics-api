@@ -9,8 +9,15 @@ import { openDatabase } from '../lib/database.js';
 import { ImportRepository } from '../repositories/import-repository.js';
 
 const config = loadDiscogsImportConfig();
-const database = openDatabase(config.databasePath);
-runMigrations(database);
+const database = openDatabase({
+  databasePath: config.databasePath,
+  useRemoteDb: config.useRemoteDb,
+  ...(config.tursoAuthToken ? { tursoAuthToken: config.tursoAuthToken } : {}),
+  ...(config.tursoDatabaseUrl
+    ? { tursoDatabaseUrl: config.tursoDatabaseUrl }
+    : {}),
+});
+await runMigrations(database);
 
 const fullRefresh = process.argv.includes('--full-refresh');
 const quiet = process.argv.includes('--quiet');

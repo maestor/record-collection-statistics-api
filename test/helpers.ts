@@ -2,7 +2,6 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { Database as DatabaseType } from 'better-sqlite3';
 import { runMigrations } from '../src/db/migrate.js';
 import type {
   DiscogsCollectionFieldsResponse,
@@ -11,7 +10,7 @@ import type {
   DiscogsReleaseDetail,
 } from '../src/discogs/types.js';
 import { DiscogsImporter } from '../src/importer/discogs-importer.js';
-import { openDatabase } from '../src/lib/database.js';
+import { type DatabaseClient, openDatabase } from '../src/lib/database.js';
 import { ImportRepository } from '../src/repositories/import-repository.js';
 
 export function readFixture<T>(name: string): T {
@@ -20,15 +19,17 @@ export function readFixture<T>(name: string): T {
   return JSON.parse(readFileSync(fixturePath, 'utf8')) as T;
 }
 
-export function createTempDatabase(): {
+export async function createTempDatabase(): Promise<{
   cleanup: () => void;
-  database: DatabaseType;
+  database: DatabaseClient;
   databasePath: string;
-} {
+}> {
   const directory = mkdtempSync(join(tmpdir(), 'discogs-api-test-'));
   const databasePath = join(directory, 'test.sqlite');
-  const database = openDatabase(databasePath);
-  runMigrations(database);
+  const database = openDatabase({
+    databasePath,
+  });
+  await runMigrations(database);
 
   return {
     database,
@@ -87,7 +88,7 @@ export function createFixtureClient(overrides?: {
 }
 
 export async function seedFixtureImport(options?: { now?: () => Date }) {
-  const tempDatabase = createTempDatabase();
+  const tempDatabase = await createTempDatabase();
   const repository = new ImportRepository(tempDatabase.database);
 
   const importer = new DiscogsImporter({

@@ -76,7 +76,7 @@ Create a local-first Discogs collection backend that:
 
 ### Batch 7
 - Add OpenAPI documentation for the API surface.
-- Make generated types available for consumer applications where practical.
+- Let consumer applications generate types on their own side when needed.
 
 ### Batch 8
 - Add Turso support behind `USE_REMOTE_DB`.
@@ -93,9 +93,9 @@ Create a local-first Discogs collection backend that:
 - Batch 3: completed
 - Batch 4: completed
 - Batch 5: completed
-- Batch 6: in progress
-- Batch 7: in progress
-- Batch 8: pending
+- Batch 6: completed
+- Batch 7: completed
+- Batch 8: in progress
 - Batch 9: pending
 
 ## Public Commands

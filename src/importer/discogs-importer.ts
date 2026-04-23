@@ -109,7 +109,7 @@ export class DiscogsImporter {
 
   async run(): Promise<DiscogsImportSummary> {
     const startedAt = this.now().toISOString();
-    const syncRun = this.repository.startSyncRun({
+    const syncRun = await this.repository.startSyncRun({
       fullRefresh: this.fullRefresh,
       releaseTtlDays: this.releaseTtlDays,
       startedAt,
@@ -122,14 +122,14 @@ export class DiscogsImporter {
 
     try {
       const identity = await this.client.getIdentity();
-      this.repository.updateRunProgress(syncRun.id, {
+      await this.repository.updateRunProgress(syncRun.id, {
         username: identity.username,
       });
 
       const fieldsResponse = await this.client.getCollectionFields(
         identity.username,
       );
-      this.repository.upsertCollectionFields(
+      await this.repository.upsertCollectionFields(
         fieldsResponse.fields.map((field) =>
           normalizeCollectionField(field, this.now().toISOString()),
         ),
@@ -153,14 +153,14 @@ export class DiscogsImporter {
         );
         totalPages = pageResponse.pagination.pages;
 
-        this.persistCollectionPage(
+        await this.persistCollectionPage(
           syncRun.id,
           pageResponse.releases,
           fieldsResponse.fields,
         );
         collectionItemsSeen += pageResponse.releases.length;
 
-        this.repository.updateRunProgress(syncRun.id, {
+        await this.repository.updateRunProgress(syncRun.id, {
           pagesProcessedDelta: 1,
           itemsSeenDelta: pageResponse.releases.length,
         });
@@ -176,12 +176,12 @@ export class DiscogsImporter {
         page += 1;
       } while (page <= totalPages);
 
-      const currentReleaseIds = this.repository.listReleaseIdsSeenInRun(
+      const currentReleaseIds = await this.repository.listReleaseIdsSeenInRun(
         syncRun.id,
       );
       const releaseIdsToRefresh = this.fullRefresh
         ? currentReleaseIds
-        : this.repository.listReleaseIdsNeedingRefresh(
+        : await this.repository.listReleaseIdsNeedingRefresh(
             currentReleaseIds,
             this.now().toISOString(),
           );
@@ -209,9 +209,9 @@ export class DiscogsImporter {
           fetchedAt,
           this.releaseTtlDays,
         );
-        this.repository.upsertRelease(normalizedRelease);
+        await this.repository.upsertRelease(normalizedRelease);
         releasesRefreshed += 1;
-        this.repository.updateRunProgress(syncRun.id, {
+        await this.repository.updateRunProgress(syncRun.id, {
           releasesRefreshedDelta: 1,
         });
         this.emitProgress({
@@ -223,19 +223,19 @@ export class DiscogsImporter {
         });
       }
 
-      this.repository.pruneCollectionItemsNotSeenInRun(syncRun.id);
+      await this.repository.pruneCollectionItemsNotSeenInRun(syncRun.id);
       const completedAt = this.now().toISOString();
-      this.repository.setSyncState(
+      await this.repository.setSyncState(
         'last_successful_sync_at',
         completedAt,
         completedAt,
       );
-      this.repository.setSyncState(
+      await this.repository.setSyncState(
         'last_successful_username',
         identity.username,
         completedAt,
       );
-      this.repository.finishRunSuccess(syncRun.id, completedAt);
+      await this.repository.finishRunSuccess(syncRun.id, completedAt);
       this.emitProgress({
         type: 'run_completed',
         runId: syncRun.id,
@@ -257,16 +257,20 @@ export class DiscogsImporter {
       const completedAt = this.now().toISOString();
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown Discogs import error';
-      this.repository.finishRunFailure(syncRun.id, completedAt, errorMessage);
+      await this.repository.finishRunFailure(
+        syncRun.id,
+        completedAt,
+        errorMessage,
+      );
       throw error;
     }
   }
 
-  private persistCollectionPage(
+  private async persistCollectionPage(
     runId: number,
     releases: DiscogsCollectionRelease[],
     fields: DiscogsCollectionField[],
-  ): void {
+  ): Promise<void> {
     const nowIso = this.now().toISOString();
     const knownFieldIds = new Set(fields.map((field) => field.id));
     const normalizedItems = releases.map((release) =>
@@ -289,7 +293,10 @@ export class DiscogsImporter {
       valuesByInstance.set(release.instance_id, values);
     }
 
-    this.repository.upsertCollectionItems(normalizedItems, valuesByInstance);
+    await this.repository.upsertCollectionItems(
+      normalizedItems,
+      valuesByInstance,
+    );
   }
 
   private emitProgress(event: DiscogsImportProgressEvent): void {
