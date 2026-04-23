@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import {
   parseBreakdownDimension,
+  parseFacetLimit,
   parseRecordsQuery,
   parseReleaseId,
 } from './http/validation.js';
@@ -101,6 +102,22 @@ export function createApp(database: Database.Database): Hono {
     return createJsonCacheResponse(
       {
         data: recordsRepository.getStatsSummary(),
+      },
+      {
+        ifNoneMatch: context.req.header('if-none-match') ?? null,
+      },
+    );
+  });
+
+  app.get('/filters', (context) => {
+    const limit = parseFacetLimit(context.req.query('limit'));
+
+    return createJsonCacheResponse(
+      {
+        data: recordsRepository.getFilterCatalog(limit),
+        meta: {
+          limit,
+        },
       },
       {
         ifNoneMatch: context.req.header('if-none-match') ?? null,

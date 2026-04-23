@@ -142,6 +142,60 @@ test('stats endpoints return collection summary and breakdowns', async () => {
   }
 });
 
+test('GET /filters returns available filter values and respects limit validation', async () => {
+  const seeded = await seedFixtureImport({
+    now: () => new Date('2026-04-23T10:00:00.000Z'),
+  });
+
+  try {
+    const app = createApp(seeded.database);
+
+    const response = await app.request('/filters?limit=1');
+    assert.equal(response.status, 200);
+
+    const payload = (await response.json()) as {
+      data: {
+        addedYears: Array<{ value: string }>;
+        artists: Array<{ itemCount: number; value: string }>;
+        countries: Array<{ value: string }>;
+        formats: Array<{ value: string }>;
+        genres: Array<{ value: string }>;
+        labels: Array<{ value: string }>;
+        ranges: {
+          added: { first: string; last: string };
+          releaseYears: { max: number; min: number };
+        };
+        releaseYears: Array<{ value: string }>;
+        styles: Array<{ value: string }>;
+      };
+      meta: { limit: number };
+    };
+
+    assert.equal(payload.meta.limit, 1);
+    assert.deepEqual(payload.data.artists, [
+      {
+        value: 'Alpha Artist',
+        itemCount: 2,
+        releaseCount: 1,
+      },
+    ]);
+    assert.equal(payload.data.labels[0]?.value, 'Aurora Audio');
+    assert.equal(payload.data.formats[0]?.value, 'CD');
+    assert.equal(payload.data.genres[0]?.value, 'Rock');
+    assert.equal(payload.data.styles[0]?.value, 'Indie Rock');
+    assert.equal(payload.data.countries[0]?.value, 'Finland');
+    assert.equal(payload.data.releaseYears[0]?.value, '1999');
+    assert.equal(payload.data.addedYears[0]?.value, '2024');
+    assert.equal(payload.data.ranges.releaseYears.min, 1999);
+    assert.equal(payload.data.ranges.releaseYears.max, 2005);
+
+    const invalidResponse = await app.request('/filters?limit=0');
+    assert.equal(invalidResponse.status, 400);
+  } finally {
+    seeded.cleanup();
+  }
+});
+
 test('GET /health reports a successful local sync snapshot', async () => {
   const seeded = await seedFixtureImport({
     now: () => new Date('2026-04-23T10:00:00.000Z'),

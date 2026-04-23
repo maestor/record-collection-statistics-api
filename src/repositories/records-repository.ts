@@ -101,6 +101,27 @@ export interface BreakdownItem {
   value: string;
 }
 
+export interface FilterCatalog {
+  addedYears: BreakdownItem[];
+  artists: BreakdownItem[];
+  countries: BreakdownItem[];
+  formats: BreakdownItem[];
+  genres: BreakdownItem[];
+  labels: BreakdownItem[];
+  ranges: {
+    added: {
+      first: string | null;
+      last: string | null;
+    };
+    releaseYears: {
+      max: number | null;
+      min: number | null;
+    };
+  };
+  releaseYears: BreakdownItem[];
+  styles: BreakdownItem[];
+}
+
 export class RecordsRepository {
   private readonly database: Database.Database;
 
@@ -535,18 +556,45 @@ export class RecordsRepository {
     };
   }
 
-  getBreakdown(dimension: BreakdownDimension): BreakdownItem[] {
-    const query = breakdownQueries[dimension];
+  getBreakdown(
+    dimension: BreakdownDimension,
+    options?: { limit?: number },
+  ): BreakdownItem[] {
+    const query =
+      options?.limit === undefined
+        ? breakdownQueries[dimension]
+        : `${breakdownQueries[dimension]}\nLIMIT ?`;
 
     return this.allRows<{
       item_count: number;
       release_count: number;
       value: string;
-    }>(query).map((row) => ({
-      value: row.value,
-      itemCount: row.item_count,
-      releaseCount: row.release_count,
-    }));
+    }>(query, ...(options?.limit === undefined ? [] : [options.limit])).map(
+      (row) => ({
+        value: row.value,
+        itemCount: row.item_count,
+        releaseCount: row.release_count,
+      }),
+    );
+  }
+
+  getFilterCatalog(limit: number): FilterCatalog {
+    const summary = this.getStatsSummary();
+
+    return {
+      artists: this.getBreakdown('artist', { limit }),
+      labels: this.getBreakdown('label', { limit }),
+      formats: this.getBreakdown('format', { limit }),
+      genres: this.getBreakdown('genre', { limit }),
+      styles: this.getBreakdown('style', { limit }),
+      countries: this.getBreakdown('country', { limit }),
+      releaseYears: this.getBreakdown('release_year', { limit }),
+      addedYears: this.getBreakdown('added_year', { limit }),
+      ranges: {
+        added: summary.addedRange,
+        releaseYears: summary.releaseYearRange,
+      },
+    };
   }
 
   getHealthSnapshot(): {

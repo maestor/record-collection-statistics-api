@@ -41,6 +41,19 @@ export interface RecordsQueryInput {
   yearTo?: number;
 }
 
+export function parseFacetLimit(value: string | undefined): number {
+  if (!value) {
+    return 25;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error('limit must be a positive integer.');
+  }
+
+  return Math.min(parsed, 250);
+}
+
 function parseOptionalTrimmedString(
   value: string | undefined,
 ): string | undefined {

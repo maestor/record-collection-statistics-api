@@ -42,6 +42,7 @@ The API itself does not require the Discogs token. Only the importer does.
 
 ## API Overview
 - `GET /health`
+- `GET /filters`
 - `GET /records`
 - `GET /records/:releaseId`
 - `GET /stats/summary`
