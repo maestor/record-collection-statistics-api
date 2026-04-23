@@ -43,6 +43,45 @@ test('GET /records returns paginated release data and stable cache metadata', as
   }
 });
 
+test('GET / exposes API discovery details', async () => {
+  const seeded = await seedFixtureImport({
+    now: () => new Date('2026-04-23T10:00:00.000Z'),
+  });
+
+  try {
+    const app = createApp(seeded.database);
+    const response = await app.request('/');
+    assert.equal(response.status, 200);
+
+    const payload = (await response.json()) as {
+      breakdownDimensions: string[];
+      capabilities: {
+        discogsOnRequestPath: boolean;
+        importerBackedCache: boolean;
+        readOnlyApi: boolean;
+      };
+      endpoints: {
+        filters: string;
+        health: string;
+        recordDetail: string;
+        records: string;
+        statsBreakdown: string;
+        statsDashboard: string;
+        statsSummary: string;
+      };
+      service: string;
+    };
+
+    assert.equal(payload.service, 'record-collection-statistics-api');
+    assert.equal(payload.capabilities.readOnlyApi, true);
+    assert.equal(payload.capabilities.discogsOnRequestPath, false);
+    assert.equal(payload.endpoints.statsDashboard, '/stats/dashboard?limit=10');
+    assert.ok(payload.breakdownDimensions.includes('artist'));
+  } finally {
+    seeded.cleanup();
+  }
+});
+
 test('GET /records validates sort options and supports artist filtering', async () => {
   const seeded = await seedFixtureImport({
     now: () => new Date('2026-04-23T10:00:00.000Z'),
@@ -137,6 +176,56 @@ test('stats endpoints return collection summary and breakdowns', async () => {
       itemCount: 2,
       releaseCount: 1,
     });
+  } finally {
+    seeded.cleanup();
+  }
+});
+
+test('GET /stats/dashboard returns summary plus top breakdowns', async () => {
+  const seeded = await seedFixtureImport({
+    now: () => new Date('2026-04-23T10:00:00.000Z'),
+  });
+
+  try {
+    const app = createApp(seeded.database);
+    const response = await app.request('/stats/dashboard?limit=1');
+    assert.equal(response.status, 200);
+
+    const payload = (await response.json()) as {
+      data: {
+        addedYears: Array<{ value: string }>;
+        countries: Array<{ value: string }>;
+        formats: Array<{ value: string }>;
+        genres: Array<{ value: string }>;
+        labels: Array<{ value: string }>;
+        styles: Array<{ value: string }>;
+        summary: {
+          totals: {
+            collectionItems: number;
+            releases: number;
+          };
+        };
+        topArtists: Array<{ itemCount: number; value: string }>;
+      };
+      meta: { limit: number };
+    };
+
+    assert.equal(payload.meta.limit, 1);
+    assert.equal(payload.data.summary.totals.collectionItems, 3);
+    assert.equal(payload.data.summary.totals.releases, 2);
+    assert.deepEqual(payload.data.topArtists, [
+      {
+        value: 'Alpha Artist',
+        itemCount: 2,
+        releaseCount: 1,
+      },
+    ]);
+    assert.equal(payload.data.labels[0]?.value, 'Aurora Audio');
+    assert.equal(payload.data.formats[0]?.value, 'CD');
+    assert.equal(payload.data.genres[0]?.value, 'Rock');
+    assert.equal(payload.data.styles[0]?.value, 'Indie Rock');
+    assert.equal(payload.data.countries[0]?.value, 'Finland');
+    assert.equal(payload.data.addedYears[0]?.value, '2024');
   } finally {
     seeded.cleanup();
   }

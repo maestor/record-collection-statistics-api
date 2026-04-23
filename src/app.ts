@@ -23,6 +23,67 @@ export function createApp(database: Database.Database): Hono {
     );
   });
 
+  app.get('/', (context) => {
+    return createJsonCacheResponse(
+      {
+        service: 'record-collection-statistics-api',
+        capabilities: {
+          importerBackedCache: true,
+          readOnlyApi: true,
+          discogsOnRequestPath: false,
+        },
+        endpoints: {
+          health: '/health',
+          filters: '/filters?limit=25',
+          records: '/records',
+          recordDetail: '/records/:releaseId',
+          statsSummary: '/stats/summary',
+          statsDashboard: '/stats/dashboard?limit=10',
+          statsBreakdown: '/stats/breakdowns/:dimension',
+        },
+        recordsQuery: {
+          supportedFilters: [
+            'q',
+            'artist',
+            'label',
+            'genre',
+            'style',
+            'format',
+            'country',
+            'year_from',
+            'year_to',
+            'added_from',
+            'added_to',
+            'page',
+            'page_size',
+            'sort',
+            'order',
+          ],
+          allowedSorts: [
+            'date_added',
+            'release_year',
+            'artist',
+            'title',
+            'lowest_price',
+          ],
+        },
+        breakdownDimensions: [
+          'artist',
+          'label',
+          'format',
+          'genre',
+          'style',
+          'country',
+          'release_year',
+          'added_year',
+        ],
+      },
+      {
+        ifNoneMatch: context.req.header('if-none-match') ?? null,
+      },
+    );
+  });
+
   app.get('/health', (context) => {
     const snapshot = recordsRepository.getHealthSnapshot();
     return createJsonCacheResponse(
@@ -102,6 +163,22 @@ export function createApp(database: Database.Database): Hono {
     return createJsonCacheResponse(
       {
         data: recordsRepository.getStatsSummary(),
+      },
+      {
+        ifNoneMatch: context.req.header('if-none-match') ?? null,
+      },
+    );
+  });
+
+  app.get('/stats/dashboard', (context) => {
+    const limit = parseFacetLimit(context.req.query('limit'));
+
+    return createJsonCacheResponse(
+      {
+        data: recordsRepository.getDashboardStats(limit),
+        meta: {
+          limit,
+        },
       },
       {
         ifNoneMatch: context.req.header('if-none-match') ?? null,

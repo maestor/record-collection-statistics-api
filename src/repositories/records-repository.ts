@@ -122,6 +122,17 @@ export interface FilterCatalog {
   styles: BreakdownItem[];
 }
 
+export interface DashboardStats {
+  addedYears: BreakdownItem[];
+  countries: BreakdownItem[];
+  formats: BreakdownItem[];
+  genres: BreakdownItem[];
+  labels: BreakdownItem[];
+  styles: BreakdownItem[];
+  summary: StatsSummary;
+  topArtists: BreakdownItem[];
+}
+
 export class RecordsRepository {
   private readonly database: Database.Database;
 
@@ -594,6 +605,19 @@ export class RecordsRepository {
         added: summary.addedRange,
         releaseYears: summary.releaseYearRange,
       },
+    };
+  }
+
+  getDashboardStats(limit: number): DashboardStats {
+    return {
+      summary: this.getStatsSummary(),
+      topArtists: this.getBreakdown('artist', { limit }),
+      labels: this.getBreakdown('label', { limit }),
+      formats: this.getBreakdown('format', { limit }),
+      genres: this.getBreakdown('genre', { limit }),
+      styles: this.getBreakdown('style', { limit }),
+      countries: this.getBreakdown('country', { limit }),
+      addedYears: this.getBreakdown('added_year'),
     };
   }
 
