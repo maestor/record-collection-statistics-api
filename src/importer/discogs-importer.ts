@@ -21,6 +21,7 @@ export interface DiscogsImporterOptions {
   >;
   fullRefresh?: boolean;
   now?: () => Date;
+  onProgress?: (event: DiscogsImportProgressEvent) => void;
   releaseTtlDays: number;
   repository: ImportRepository;
 }
@@ -33,6 +34,54 @@ export interface DiscogsImportSummary {
   username: string;
 }
 
+export type DiscogsImportProgressEvent =
+  | {
+      runId: number;
+      startedAt: string;
+      type: 'run_started';
+    }
+  | {
+      runId: number;
+      totalFields: number;
+      type: 'collection_fields_loaded';
+      username: string;
+    }
+  | {
+      collectionItemsSeen: number;
+      itemsOnPage: number;
+      page: number;
+      runId: number;
+      totalPages: number;
+      type: 'collection_page_synced';
+    }
+  | {
+      releaseCountInCollection: number;
+      releaseCountToRefresh: number;
+      runId: number;
+      type: 'release_refresh_planned';
+    }
+  | {
+      processed: number;
+      releaseId: number;
+      runId: number;
+      totalToRefresh: number;
+      type: 'release_refreshed';
+    }
+  | {
+      releasesRefreshed: number;
+      runId: number;
+      type: 'release_refresh_skipped';
+    }
+  | {
+      collectionItemsSeen: number;
+      completedAt: string;
+      pagesProcessed: number;
+      releasesRefreshed: number;
+      runId: number;
+      type: 'run_completed';
+      username: string;
+    };
+
 export class DiscogsImporter {
   private readonly client: Pick<
     DiscogsClient,
@@ -43,6 +92,9 @@ export class DiscogsImporter {
   >;
   private readonly fullRefresh: boolean;
   private readonly now: () => Date;
+  private readonly onProgress:
+    | ((event: DiscogsImportProgressEvent) => void)
+    | undefined;
   private readonly releaseTtlDays: number;
   private readonly repository: ImportRepository;
 
@@ -50,6 +102,7 @@ export class DiscogsImporter {
     this.client = options.client;
     this.fullRefresh = options.fullRefresh ?? false;
     this.now = options.now ?? (() => new Date());
+    this.onProgress = options.onProgress;
     this.releaseTtlDays = options.releaseTtlDays;
     this.repository = options.repository;
   }
@@ -59,6 +112,11 @@ export class DiscogsImporter {
     const syncRun = this.repository.startSyncRun({
       fullRefresh: this.fullRefresh,
       releaseTtlDays: this.releaseTtlDays,
+      startedAt,
+    });
+    this.emitProgress({
+      type: 'run_started',
+      runId: syncRun.id,
       startedAt,
     });
 
@@ -76,6 +134,12 @@ export class DiscogsImporter {
           normalizeCollectionField(field, this.now().toISOString()),
         ),
       );
+      this.emitProgress({
+        type: 'collection_fields_loaded',
+        runId: syncRun.id,
+        username: identity.username,
+        totalFields: fieldsResponse.fields.length,
+      });
 
       let page = 1;
       let totalPages = 1;
@@ -100,6 +164,14 @@ export class DiscogsImporter {
           pagesProcessedDelta: 1,
           itemsSeenDelta: pageResponse.releases.length,
         });
+        this.emitProgress({
+          type: 'collection_page_synced',
+          runId: syncRun.id,
+          page,
+          totalPages,
+          itemsOnPage: pageResponse.releases.length,
+          collectionItemsSeen,
+        });
 
         page += 1;
       } while (page <= totalPages);
@@ -113,8 +185,22 @@ export class DiscogsImporter {
             currentReleaseIds,
             this.now().toISOString(),
           );
+      this.emitProgress({
+        type: 'release_refresh_planned',
+        runId: syncRun.id,
+        releaseCountInCollection: currentReleaseIds.length,
+        releaseCountToRefresh: releaseIdsToRefresh.length,
+      });
 
       let releasesRefreshed = 0;
+      if (releaseIdsToRefresh.length === 0) {
+        this.emitProgress({
+          type: 'release_refresh_skipped',
+          runId: syncRun.id,
+          releasesRefreshed,
+        });
+      }
+
       for (const releaseId of releaseIdsToRefresh) {
         const fetchedAt = this.now().toISOString();
         const detail = await this.client.getRelease(releaseId);
@@ -127,6 +213,13 @@ export class DiscogsImporter {
         releasesRefreshed += 1;
         this.repository.updateRunProgress(syncRun.id, {
           releasesRefreshedDelta: 1,
+        });
+        this.emitProgress({
+          type: 'release_refreshed',
+          runId: syncRun.id,
+          releaseId,
+          processed: releasesRefreshed,
+          totalToRefresh: releaseIdsToRefresh.length,
         });
       }
 
@@ -143,6 +236,15 @@ export class DiscogsImporter {
         completedAt,
       );
       this.repository.finishRunSuccess(syncRun.id, completedAt);
+      this.emitProgress({
+        type: 'run_completed',
+        runId: syncRun.id,
+        username: identity.username,
+        completedAt,
+        pagesProcessed: totalPages,
+        collectionItemsSeen,
+        releasesRefreshed,
+      });
 
       return {
         runId: syncRun.id,
@@ -188,5 +290,9 @@ export class DiscogsImporter {
     }
 
     this.repository.upsertCollectionItems(normalizedItems, valuesByInstance);
+  }
+
+  private emitProgress(event: DiscogsImportProgressEvent): void {
+    this.onProgress?.(event);
   }
 }

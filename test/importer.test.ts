@@ -6,7 +6,10 @@ import type {
   DiscogsCollectionReleasesPage,
   DiscogsReleaseDetail,
 } from '../src/discogs/types.js';
-import { DiscogsImporter } from '../src/importer/discogs-importer.js';
+import {
+  DiscogsImporter,
+  type DiscogsImportProgressEvent,
+} from '../src/importer/discogs-importer.js';
 import { ImportRepository } from '../src/repositories/import-repository.js';
 import {
   createFixtureClient,
@@ -128,6 +131,67 @@ test('DiscogsImporter refreshes stale releases and prunes removed collection row
 
     assert.equal(remainingItemCount, 2);
     assert.equal(refreshedTitle, 'Northern Lights (Remastered)');
+  } finally {
+    cleanup();
+  }
+});
+
+test('DiscogsImporter emits progress events for collection sync and release enrichment', async () => {
+  const { database, cleanup } = createTempDatabase();
+  const progressEvents: DiscogsImportProgressEvent[] = [];
+
+  try {
+    const repository = new ImportRepository(database);
+    const importer = new DiscogsImporter({
+      client: createFixtureClient(),
+      now: () => new Date('2026-04-23T10:00:00.000Z'),
+      onProgress: (event) => {
+        progressEvents.push(event);
+      },
+      releaseTtlDays: 30,
+      repository,
+    });
+
+    await importer.run();
+
+    assert.equal(progressEvents[0]?.type, 'run_started');
+    assert.equal(progressEvents[1]?.type, 'collection_fields_loaded');
+
+    const pageEvents = progressEvents.filter(
+      (
+        event,
+      ): event is Extract<
+        DiscogsImportProgressEvent,
+        { type: 'collection_page_synced' }
+      > => event.type === 'collection_page_synced',
+    );
+    assert.equal(pageEvents.length, 2);
+    assert.deepEqual(
+      pageEvents.map((event) => event.collectionItemsSeen),
+      [2, 3],
+    );
+
+    const plannedEvent = progressEvents.find(
+      (
+        event,
+      ): event is Extract<
+        DiscogsImportProgressEvent,
+        { type: 'release_refresh_planned' }
+      > => event.type === 'release_refresh_planned',
+    );
+    assert.equal(plannedEvent?.releaseCountInCollection, 2);
+    assert.equal(plannedEvent?.releaseCountToRefresh, 2);
+
+    const refreshedEvents = progressEvents.filter(
+      (
+        event,
+      ): event is Extract<
+        DiscogsImportProgressEvent,
+        { type: 'release_refreshed' }
+      > => event.type === 'release_refreshed',
+    );
+    assert.equal(refreshedEvents.length, 2);
+    assert.equal(progressEvents.at(-1)?.type, 'run_completed');
   } finally {
     cleanup();
   }

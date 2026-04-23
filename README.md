@@ -26,6 +26,7 @@ Local-first backend for importing a Discogs collection into SQLite and serving a
 ## Commands
 - `npm run db:migrate` applies SQL migrations to the local SQLite database
 - `npm run import:discogs` syncs the Discogs collection and refreshes stale release details
+- The importer prints progress to `stderr` during long runs and keeps the final JSON summary on `stdout`
 - `npm run dev` starts the local read-only API
 - `npm run test` runs integration-style tests
 - `npm run verify` runs typecheck, lint, and tests
