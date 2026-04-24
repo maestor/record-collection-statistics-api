@@ -439,3 +439,43 @@ test('GET /health reports a successful local sync snapshot', async () => {
     seeded.cleanup();
   }
 });
+
+test('application error handler returns validation errors as 400 and unexpected errors as 500', async () => {
+  const seeded = await seedFixtureImport({
+    now: () => new Date('2026-04-23T10:00:00.000Z'),
+  });
+
+  try {
+    const validationFailureDatabase = Object.create(
+      seeded.database,
+    ) as typeof seeded.database;
+    validationFailureDatabase.queryOne = async () => {
+      throw new Error('releaseId must be a positive integer.');
+    };
+    const validationFailureApp = createApp(validationFailureDatabase);
+    const validationFailureResponse =
+      await validationFailureApp.request('/health');
+
+    assert.equal(validationFailureResponse.status, 400);
+    assert.deepEqual(await validationFailureResponse.json(), {
+      error: 'releaseId must be a positive integer.',
+    });
+
+    const unexpectedFailureDatabase = Object.create(
+      seeded.database,
+    ) as typeof seeded.database;
+    unexpectedFailureDatabase.queryOne = async () => {
+      throw new Error('database offline');
+    };
+    const unexpectedFailureApp = createApp(unexpectedFailureDatabase);
+    const unexpectedFailureResponse =
+      await unexpectedFailureApp.request('/health');
+
+    assert.equal(unexpectedFailureResponse.status, 500);
+    assert.deepEqual(await unexpectedFailureResponse.json(), {
+      error: 'database offline',
+    });
+  } finally {
+    seeded.cleanup();
+  }
+});

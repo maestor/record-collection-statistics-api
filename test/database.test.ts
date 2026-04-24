@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { runMigrations } from '../src/db/migrate.js';
 import { openDatabase } from '../src/lib/database.js';
 
 test('openDatabase creates parent directories and exposes local query helpers', async () => {
@@ -144,4 +145,29 @@ test('openDatabase validates required remote database settings before connecting
       }),
     /TURSO_AUTH_TOKEN is required when USE_REMOTE_DB is true\./,
   );
+});
+
+test('runMigrations is idempotent after applying the schema once', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'discogs-db-test-'));
+  const database = openDatabase({
+    databasePath: join(directory, 'migrations.sqlite'),
+  });
+
+  try {
+    await runMigrations(database);
+    await runMigrations(database);
+
+    const migrations = await database.queryAll<{ name: string }>(
+      'SELECT name FROM schema_migrations ORDER BY name',
+    );
+    const releaseCount = await database.queryOne<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM releases',
+    );
+
+    assert.deepEqual(migrations, [{ name: '001_initial.sql' }]);
+    assert.equal(releaseCount?.count, 0);
+  } finally {
+    database.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
 });

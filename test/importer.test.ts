@@ -608,3 +608,43 @@ test('DiscogsClient throws non-retryable API errors without retrying', async () 
   );
   assert.equal(requestCount, 1);
 });
+
+test('DiscogsClient uses default fetch, retry count, and rate-limit sleep when not overridden', async () => {
+  const originalFetch = globalThis.fetch;
+  let requestCount = 0;
+
+  try {
+    globalThis.fetch = async () => {
+      requestCount += 1;
+
+      if (requestCount <= 3) {
+        return new Response('temporary outage', {
+          status: 503,
+          headers: {
+            'retry-after': '0',
+          },
+        });
+      }
+
+      return new Response(JSON.stringify(readFixture('identity.json')), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+        },
+      });
+    };
+
+    const client = new DiscogsClient({
+      accessToken: 'test-token',
+      userAgent: 'test-agent',
+      baseUrl: 'https://api.discogs.com',
+      minIntervalMs: 1,
+    });
+    const identity = await client.getIdentity();
+
+    assert.equal(identity.username, 'fixture-user');
+    assert.equal(requestCount, 4);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

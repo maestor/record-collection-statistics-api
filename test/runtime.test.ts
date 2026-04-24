@@ -8,6 +8,7 @@ import type { DatabaseClient } from '../src/lib/database.js';
 import {
   createRequestHandler,
   createRuntimeApp,
+  handleRequest,
   type RuntimeDependencies,
 } from '../src/runtime.js';
 
@@ -36,6 +37,49 @@ test('createRuntimeApp can build the production runtime app against SQLite', asy
     assert.equal(payload.ok, true);
     assert.equal(payload.database.totalItems, 0);
     assert.equal(payload.database.releaseCount, 0);
+  } finally {
+    if (originalDatabasePath === undefined) {
+      delete process.env.DATABASE_PATH;
+    } else {
+      process.env.DATABASE_PATH = originalDatabasePath;
+    }
+
+    if (originalUseRemoteDb === undefined) {
+      delete process.env.USE_REMOTE_DB;
+    } else {
+      process.env.USE_REMOTE_DB = originalUseRemoteDb;
+    }
+
+    if (originalApiReadKey === undefined) {
+      delete process.env.API_READ_KEY;
+    } else {
+      process.env.API_READ_KEY = originalApiReadKey;
+    }
+
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('handleRequest default export path delegates to the cached runtime app', async () => {
+  const originalDatabasePath = process.env.DATABASE_PATH;
+  const originalUseRemoteDb = process.env.USE_REMOTE_DB;
+  const originalApiReadKey = process.env.API_READ_KEY;
+  const directory = mkdtempSync(
+    join(tmpdir(), 'discogs-runtime-handler-test-'),
+  );
+
+  try {
+    process.env.DATABASE_PATH = join(directory, 'runtime.sqlite');
+    process.env.USE_REMOTE_DB = 'false';
+    delete process.env.API_READ_KEY;
+
+    const response = await handleRequest(new Request('http://localhost/'));
+    const payload = (await response.json()) as {
+      service: string;
+    };
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.service, 'record-collection-statistics-api');
   } finally {
     if (originalDatabasePath === undefined) {
       delete process.env.DATABASE_PATH;
