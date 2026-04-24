@@ -40,20 +40,29 @@ function createCollectionRelease(
 
 test('DiscogsImporter imports fixture data and is idempotent for fresh releases', async () => {
   const { database, cleanup } = await createTempDatabase();
+  const progressEvents: DiscogsImportProgressEvent[] = [];
 
   try {
     const repository = new ImportRepository(database);
     const importer = new DiscogsImporter({
       client: createFixtureClient(),
       now: () => new Date('2026-04-23T10:00:00.000Z'),
+      onProgress: (event) => {
+        progressEvents.push(event);
+      },
       releaseTtlDays: 30,
       repository,
     });
 
     const firstRun = await importer.run();
+    const firstRunEvents = [...progressEvents];
     assert.equal(firstRun.collectionItemsSeen, 3);
     assert.equal(firstRun.pagesProcessed, 2);
     assert.equal(firstRun.releasesRefreshed, 2);
+    assert.equal(
+      firstRunEvents.some((event) => event.type === 'release_refresh_skipped'),
+      false,
+    );
 
     const countsAfterFirstRun = await database.queryOne<{
       field_value_count: number;
@@ -70,8 +79,37 @@ test('DiscogsImporter imports fixture data and is idempotent for fresh releases'
     assert.equal(countsAfterFirstRun?.release_count, 2);
     assert.equal(countsAfterFirstRun?.field_value_count, 4);
 
+    const firstRunRecord = await database.queryOne<{
+      completed_at: string | null;
+      error_message: string | null;
+      releases_refreshed: number;
+      status: string;
+      username: string | null;
+    }>('SELECT * FROM sync_runs WHERE id = ?', [firstRun.runId]);
+    const usernameState = await database.queryOne<{ value: string }>(
+      "SELECT value FROM sync_state WHERE key = 'last_successful_username'",
+    );
+
+    assert.equal(firstRunRecord?.status, 'succeeded');
+    assert.equal(firstRunRecord?.completed_at, '2026-04-23T10:00:00.000Z');
+    assert.equal(firstRunRecord?.error_message, null);
+    assert.equal(firstRunRecord?.releases_refreshed, 2);
+    assert.equal(firstRunRecord?.username, 'fixture-user');
+    assert.equal(usernameState?.value, 'fixture-user');
+
     const secondRun = await importer.run();
+    const secondRunEvents = progressEvents.slice(firstRunEvents.length);
     assert.equal(secondRun.releasesRefreshed, 0);
+    assert.deepEqual(
+      secondRunEvents
+        .filter((event) => event.type === 'release_refresh_skipped')
+        .map((event) => event.releasesRefreshed),
+      [0],
+    );
+    assert.equal(
+      secondRunEvents.some((event) => event.type === 'release_refreshed'),
+      false,
+    );
 
     const countsAfterSecondRun = await database.queryOne<{
       item_count: number;
@@ -84,6 +122,91 @@ test('DiscogsImporter imports fixture data and is idempotent for fresh releases'
 
     assert.equal(countsAfterSecondRun?.item_count, 3);
     assert.equal(countsAfterSecondRun?.release_count, 2);
+  } finally {
+    cleanup();
+  }
+});
+
+test('DiscogsImporter replaces collection item field values on reimport', async () => {
+  const { database, cleanup } = await createTempDatabase();
+
+  try {
+    const repository = new ImportRepository(database);
+    const now = () => new Date('2026-04-23T10:00:00.000Z');
+    await new DiscogsImporter({
+      client: createFixtureClient(),
+      now,
+      releaseTtlDays: 30,
+      repository,
+    }).run();
+
+    const pageOne = readFixture<DiscogsCollectionReleasesPage>(
+      'collection-page-1.json',
+    );
+    const firstRelease = pageOne.releases[0];
+    assert.ok(firstRelease);
+    pageOne.releases[0] = {
+      ...firstRelease,
+      notes: [],
+    };
+
+    await new DiscogsImporter({
+      client: createFixtureClient({
+        collectionPages: [
+          pageOne,
+          readFixture<DiscogsCollectionReleasesPage>('collection-page-2.json'),
+        ],
+      }),
+      now,
+      releaseTtlDays: 30,
+      repository,
+    }).run();
+
+    const valuesByInstance = await database.queryAll<{
+      instance_id: number;
+      total: number;
+    }>(`
+      SELECT ci.instance_id, COUNT(civ.field_id) AS total
+      FROM collection_items ci
+      LEFT JOIN collection_item_field_values civ
+        ON civ.instance_id = ci.instance_id
+      GROUP BY ci.instance_id
+      ORDER BY ci.instance_id
+    `);
+
+    assert.deepEqual(valuesByInstance, [
+      { instance_id: 1001, total: 0 },
+      { instance_id: 1002, total: 1 },
+      { instance_id: 2001, total: 1 },
+    ]);
+  } finally {
+    cleanup();
+  }
+});
+
+test('ImportRepository treats releases expiring exactly at the reference time as stale', async () => {
+  const { database, cleanup } = await createTempDatabase();
+
+  try {
+    const repository = new ImportRepository(database);
+    await new DiscogsImporter({
+      client: createFixtureClient(),
+      now: () => new Date('2026-04-23T10:00:00.000Z'),
+      releaseTtlDays: 30,
+      repository,
+    }).run();
+
+    const staleAfter =
+      (
+        await database.queryOne<{ stale_after: string }>(
+          'SELECT stale_after FROM releases WHERE release_id = 101',
+        )
+      )?.stale_after ?? '';
+
+    assert.deepEqual(
+      await repository.listReleaseIdsNeedingRefresh([101], staleAfter),
+      [101],
+    );
   } finally {
     cleanup();
   }

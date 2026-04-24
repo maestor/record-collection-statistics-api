@@ -141,11 +141,10 @@ export class DiscogsImporter {
         totalFields: fieldsResponse.fields.length,
       });
 
-      let page = 1;
       let totalPages = 1;
       let collectionItemsSeen = 0;
 
-      do {
+      for (let page = 1; page <= totalPages; page += 1) {
         const pageResponse = await this.client.getCollectionReleases(
           identity.username,
           page,
@@ -172,9 +171,7 @@ export class DiscogsImporter {
           itemsOnPage: pageResponse.releases.length,
           collectionItemsSeen,
         });
-
-        page += 1;
-      } while (page <= totalPages);
+      }
 
       const currentReleaseIds = await this.repository.listReleaseIdsSeenInRun(
         syncRun.id,

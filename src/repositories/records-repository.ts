@@ -196,7 +196,7 @@ export class RecordsRepository {
           ) AS latest_date_added
         FROM releases r
         WHERE ${whereSql}
-        ORDER BY ${sortExpression} ${query.order.toUpperCase()}, r.release_id ASC
+        ORDER BY ${sortExpression} ${query.order}, r.release_id ASC
         LIMIT ? OFFSET ?
       `,
       [...params, query.pageSize, offset],
@@ -436,11 +436,7 @@ export class RecordsRepository {
         }>,
       };
 
-      if (
-        row.field_id !== null &&
-        row.field_name !== null &&
-        row.value_text !== null
-      ) {
+      if (row.field_name !== null && row.value_text !== null) {
         existing.fieldValues.push({
           fieldId: Number(row.field_id),
           fieldName: row.field_name,
@@ -600,11 +596,18 @@ export class RecordsRepository {
         ? breakdownQueries[dimension]
         : `${breakdownQueries[dimension]}\nLIMIT ?`;
 
-    const rows = await this.database.queryAll<{
-      item_count: number;
-      release_count: number;
-      value: string;
-    }>(query, options?.limit === undefined ? [] : [options.limit]);
+    const rows =
+      options?.limit === undefined
+        ? await this.database.queryAll<{
+            item_count: number;
+            release_count: number;
+            value: string;
+          }>(query)
+        : await this.database.queryAll<{
+            item_count: number;
+            release_count: number;
+            value: string;
+          }>(query, [options.limit]);
 
     return rows.map((row) => ({
       value: row.value,

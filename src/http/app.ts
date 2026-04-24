@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { type Context, Hono } from 'hono';
 import type { DatabaseClient } from '../lib/database.js';
 import { createJsonCacheResponse } from '../lib/http-cache.js';
 import { buildOpenApiDocument } from '../openapi/spec.js';
@@ -17,22 +17,21 @@ export interface AppOptions {
   apiReadKey?: string;
 }
 
+const rootPath: '/' = '/';
+
 function isLocalHostname(hostname: string): boolean {
   return (
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname === '[::1]' ||
-    hostname === '::1'
+    hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]'
   );
 }
 
 function resolvePresentedApiKey(request: Request): string | null {
-  const xApiKey = request.headers.get('x-api-key')?.trim();
+  const xApiKey = request.headers.get('x-api-key');
   if (xApiKey) {
     return xApiKey;
   }
 
-  const authorization = request.headers.get('authorization')?.trim();
+  const authorization = request.headers.get('authorization');
   if (!authorization) {
     return null;
   }
@@ -44,6 +43,12 @@ function resolvePresentedApiKey(request: Request): string | null {
 
   const bearerToken = authorization.slice(bearerPrefix.length).trim();
   return bearerToken || null;
+}
+
+function cacheOptions(context: Context): { ifNoneMatch: string | null } {
+  return {
+    ifNoneMatch: context.req.header('if-none-match') ?? null,
+  };
 }
 
 export function createApp(
@@ -96,7 +101,7 @@ export function createApp(
     await next();
   });
 
-  app.get('/', (context) => {
+  app.get(rootPath, (context) => {
     validateAllowedQueryKeys(context.req.query(), new Set(), '/');
 
     return createJsonCacheResponse(
@@ -157,7 +162,7 @@ export function createApp(
         ],
       },
       {
-        ifNoneMatch: context.req.header('if-none-match') ?? null,
+        ...cacheOptions(context),
       },
     );
   });
@@ -165,9 +170,10 @@ export function createApp(
   app.get('/openapi.json', (context) => {
     validateAllowedQueryKeys(context.req.query(), new Set(), '/openapi.json');
 
-    return createJsonCacheResponse(buildOpenApiDocument(), {
-      ifNoneMatch: context.req.header('if-none-match') ?? null,
-    });
+    return createJsonCacheResponse(
+      buildOpenApiDocument(),
+      cacheOptions(context),
+    );
   });
 
   app.get('/health', async (context) => {
@@ -183,9 +189,7 @@ export function createApp(
           lastSuccessfulSyncAt: snapshot.lastSuccessfulSyncAt,
         },
       },
-      {
-        ifNoneMatch: context.req.header('if-none-match') ?? null,
-      },
+      cacheOptions(context),
     );
   });
 
@@ -203,7 +207,7 @@ export function createApp(
           page: query.page,
           pageSize: query.pageSize,
           total,
-          totalPages: total === 0 ? 0 : Math.ceil(total / query.pageSize),
+          totalPages: Math.ceil(total / query.pageSize),
         },
         filters: {
           q: query.q ?? null,
@@ -221,9 +225,7 @@ export function createApp(
           order: query.order,
         },
       },
-      {
-        ifNoneMatch: context.req.header('if-none-match') ?? null,
-      },
+      cacheOptions(context),
     );
   });
 
@@ -249,9 +251,7 @@ export function createApp(
       {
         data: record,
       },
-      {
-        ifNoneMatch: context.req.header('if-none-match') ?? null,
-      },
+      cacheOptions(context),
     );
   });
 
@@ -262,9 +262,7 @@ export function createApp(
       {
         data: await recordsRepository.getStatsSummary(),
       },
-      {
-        ifNoneMatch: context.req.header('if-none-match') ?? null,
-      },
+      cacheOptions(context),
     );
   });
 
@@ -280,9 +278,7 @@ export function createApp(
           limit,
         },
       },
-      {
-        ifNoneMatch: context.req.header('if-none-match') ?? null,
-      },
+      cacheOptions(context),
     );
   });
 
@@ -298,9 +294,7 @@ export function createApp(
           limit,
         },
       },
-      {
-        ifNoneMatch: context.req.header('if-none-match') ?? null,
-      },
+      cacheOptions(context),
     );
   });
 
@@ -319,9 +313,7 @@ export function createApp(
           dimension,
         },
       },
-      {
-        ifNoneMatch: context.req.header('if-none-match') ?? null,
-      },
+      cacheOptions(context),
     );
   });
 

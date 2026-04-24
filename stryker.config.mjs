@@ -2,8 +2,12 @@
 const config = {
   mutate: [
     'src/db/copy.ts',
+    'src/http/app.ts',
     'src/http/validation.ts',
+    'src/importer/discogs-importer.ts',
     'src/importer/mappers.ts',
+    'src/repositories/import-repository.ts',
+    'src/repositories/records-repository.ts',
   ],
   testRunner: 'tap',
   checkers: ['typescript'],
@@ -11,17 +15,18 @@ const config = {
   coverageAnalysis: 'perTest',
   reporters: ['clear-text', 'html', 'progress'],
   thresholds: {
-    high: 90,
-    low: 80,
-    break: 75,
+    high: 100,
+    low: 100,
+    break: 100,
   },
   tap: {
     testFiles: [
-      'test/api.test.ts',
-      'test/db-copy.test.ts',
-      'test/importer.test.ts',
-      'test/mappers.test.ts',
       'test/validation.test.ts',
+      'test/mappers.test.ts',
+      'test/records-repository.test.ts',
+      'test/importer.test.ts',
+      'test/db-copy.test.ts',
+      'test/api.test.ts',
     ],
     nodeArgs: ['--test-reporter=tap', '--import', 'tsx'],
     forceBail: true,
