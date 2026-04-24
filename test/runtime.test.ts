@@ -8,6 +8,7 @@ import type { DatabaseClient } from '../src/lib/database.js';
 import {
   createRequestHandler,
   createRuntimeApp,
+  createRuntimeDelegatingApp,
   handleRequest,
   type RuntimeDependencies,
 } from '../src/runtime.js';
@@ -208,5 +209,27 @@ test('createRequestHandler resolves the runtime app and delegates fetch', async 
   });
 
   assert.equal(await handler(request), response);
+  assert.equal(resolved, 1);
+});
+
+test('createRuntimeDelegatingApp returns a Hono app that delegates to the runtime app', async () => {
+  const runtimeResponse = new Response('from-runtime', {
+    status: 202,
+  });
+  let resolved = 0;
+
+  const app = createRuntimeDelegatingApp(async () => {
+    resolved += 1;
+    return {
+      fetch(request) {
+        assert.equal(new URL(request.url).pathname, '/health');
+        return runtimeResponse;
+      },
+    } as Awaited<ReturnType<typeof createRuntimeApp>>;
+  });
+
+  const response = await app.fetch(new Request('https://example.test/health'));
+
+  assert.equal(response, runtimeResponse);
   assert.equal(resolved, 1);
 });

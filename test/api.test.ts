@@ -24,8 +24,8 @@ async function assertCacheRevalidation(
   assert.equal(revalidatedResponse.status, 304);
 }
 
-test('Vercel entrypoints default-export request handler functions', () => {
-  assert.equal(typeof appHandler, 'function');
+test('Vercel entrypoints default-export Hono apps', () => {
+  assert.equal(typeof appHandler.fetch, 'function');
   assert.equal(indexHandler, appHandler);
 });
 

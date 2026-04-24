@@ -1,4 +1,4 @@
-import type { Hono } from 'hono';
+import { Hono } from 'hono';
 import type { AppOptions } from './http/app.js';
 import type { RuntimeConfig } from './lib/config.js';
 import type {
@@ -74,4 +74,18 @@ export function createRequestHandler(
   };
 }
 
+export function createRuntimeDelegatingApp(
+  resolveApp: () => Promise<RuntimeApp> = getRuntimeApp,
+): Hono {
+  const app = new Hono();
+
+  app.all('*', async (context) => {
+    const runtimeApp = await resolveApp();
+    return runtimeApp.fetch(context.req.raw);
+  });
+
+  return app;
+}
+
 export const handleRequest = createRequestHandler();
+export const vercelApp = createRuntimeDelegatingApp();
