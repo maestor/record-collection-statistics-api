@@ -82,3 +82,31 @@ test('normalizeReleaseDetail maps cover image, collection arrays, and track defa
     },
   ]);
 });
+
+test('normalizeReleaseDetail preserves empty defaults for missing collection arrays', () => {
+  const normalized = normalizeReleaseDetail(
+    {
+      id: 303,
+      title: 'Sparse Release',
+      formats: [
+        {
+          name: 'Cassette',
+        },
+      ],
+    } as DiscogsReleaseDetail,
+    '2026-04-23T10:00:00.000Z',
+    30,
+  );
+
+  assert.deepEqual(normalized.formats, [
+    {
+      position: 0,
+      name: 'Cassette',
+      qty: null,
+      formatText: null,
+      descriptionsJson: '[]',
+    },
+  ]);
+  assert.deepEqual(normalized.genres, []);
+  assert.deepEqual(normalized.styles, []);
+});

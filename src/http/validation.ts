@@ -143,12 +143,8 @@ function parseOptionalInteger(
   }
 
   const trimmed = value.trim();
-  if (!/^-?\d+$/.test(trimmed)) {
-    throw new Error(`${label} must be an integer.`);
-  }
-
-  const parsed = Number.parseInt(trimmed, 10);
-  if (!Number.isInteger(parsed)) {
+  const parsed = Number(trimmed);
+  if (trimmed === '' || !Number.isInteger(parsed)) {
     throw new Error(`${label} must be an integer.`);
   }
 
@@ -169,7 +165,7 @@ function parseDateBoundary(
     throw new Error(`${label} must be a valid date or ISO timestamp.`);
   }
 
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+  if (value === parsedDate.toISOString().slice(0, 10)) {
     return mode === 'start' ? startOfDayUtc(value) : endOfDayUtc(value);
   }
 
@@ -239,12 +235,7 @@ export function parseRecordsQuery(
 }
 
 export function parseReleaseId(value: string): number {
-  const trimmed = value.trim();
-  if (!/^\d+$/.test(trimmed)) {
-    throw new Error('releaseId must be a positive integer.');
-  }
-
-  const parsed = Number.parseInt(trimmed, 10);
+  const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw new Error('releaseId must be a positive integer.');
   }

@@ -178,7 +178,7 @@ const copyTables: CopyTableDefinition[] = [
 ];
 
 function quoteIdentifier(value: string): string {
-  return `"${value.replaceAll('"', '""')}"`;
+  return `"${value}"`;
 }
 
 function buildDeleteSql(tableName: string): string {
@@ -206,41 +206,15 @@ async function replaceTableRows(
   );
   await target.execute(buildDeleteSql(table.name));
 
-  if (rows.length === 0) {
-    return 0;
-  }
-
   const insertSql = buildInsertSql(table);
   for (const row of rows) {
     await target.execute(
       insertSql,
-      table.columns.map((column) => toInValue(row[column])),
+      table.columns.map((column) => row[column] as InValue),
     );
   }
 
   return rows.length;
-}
-
-function toInValue(value: unknown): InValue {
-  if (
-    value === null ||
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    typeof value === 'bigint' ||
-    typeof value === 'boolean' ||
-    value instanceof ArrayBuffer ||
-    value instanceof Uint8Array
-  ) {
-    return value;
-  }
-
-  if (value === undefined) {
-    return null;
-  }
-
-  throw new Error(
-    `Unsupported value encountered during database copy: ${typeof value}`,
-  );
 }
 
 export async function copyDatabaseContents(options: {
