@@ -1,7 +1,7 @@
 # Deployment
 
 ## Vercel
-The API deployment entrypoints are `src/app.ts` and `src/index.ts`. Both default-export a request handler function. `package.json` also points `main` at `src/index.ts` so Vercel has an explicit server entrypoint.
+The API deployment entrypoints are `src/app.ts` and `src/index.ts`. Both default-export a Hono app, which matches Vercel's zero-configuration Hono backend entrypoint shape. `package.json` also points `main` at `src/index.ts` so Vercel has an explicit server entrypoint.
 
 Local development still uses `src/server.ts` through `npm run dev`.
 
