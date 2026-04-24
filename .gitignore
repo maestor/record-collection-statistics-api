@@ -24,6 +24,9 @@ coverage
 reports
 .stryker-tmp
 
+# Local planning notes
+docs/plans/
+
 # nyc test coverage
 .nyc_output
 

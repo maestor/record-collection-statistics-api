@@ -21,6 +21,7 @@
 - Preserve backwards-compatible response shapes unless the user asks for a breaking change.
 - Keep `npm run verify` fast for routine development, and use `npm run test:mutation` separately when you want the stronger mutation-testing signal.
 - Keep README focused on project overview and user-facing basics. Put detailed deployment, development, and testing procedures under `docs/` and link to them from README when needed.
+- Treat `docs/plans/` as local planning scratch space. Do not commit plan files by default; only commit them when the user explicitly asks for a plan to be preserved in the repository.
 
 ## Commit Strategy
 - Commit in reasonable implementation batches instead of waiting until the very end.
