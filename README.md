@@ -85,7 +85,7 @@ The OpenAPI document is exposed at `GET /openapi.json` for consumers that want t
 - Keep handlers stateless so deployment to Vercel is straightforward when the project is ready.
 
 ## Vercel Deployment
-This repo uses Vercel-friendly `src/app.ts` and `src/index.ts` entries that default-export a request handler function, while local development uses `src/server.ts`.
+This repo uses Vercel-friendly `src/app.ts` and `src/index.ts` entries that default-export a request handler function, while local development uses `src/server.ts`. `package.json` also points `main` at `src/index.ts` so Vercel's entrypoint discovery has an explicit server file.
 
 Based on the current official Hono and Vercel docs:
 

@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "src/index.ts",
   "description": "Local-first Discogs collection importer and read-only statistics API.",
   "engines": {
     "node": ">=24.0.0"
