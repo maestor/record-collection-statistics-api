@@ -1,8 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createApp } from '../src/app.js';
+import appHandler from '../src/app.js';
+import { createApp } from '../src/http/app.js';
+import indexHandler from '../src/index.js';
 import { seedFixtureImport } from './helpers.js';
+
+test('Vercel entrypoints default-export request handler functions', () => {
+  assert.equal(typeof appHandler, 'function');
+  assert.equal(indexHandler, appHandler);
+});
 
 test('GET /records returns paginated release data and stable cache metadata', async () => {
   const seeded = await seedFixtureImport({

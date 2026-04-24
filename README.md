@@ -85,11 +85,12 @@ The OpenAPI document is exposed at `GET /openapi.json` for consumers that want t
 - Keep handlers stateless so deployment to Vercel is straightforward when the project is ready.
 
 ## Vercel Deployment
-This repo now uses a Vercel-friendly `src/index.ts` that default-exports the Hono app, while local development uses `src/server.ts`.
+This repo uses Vercel-friendly `src/app.ts` and `src/index.ts` entries that default-export a request handler function, while local development uses `src/server.ts`.
 
 Based on the current official Hono and Vercel docs:
 
-- Hono's Vercel guide says a Vercel deployment can use a default-exported Hono app from `index.ts` or `src/index.ts`.
+- Hono's Vercel guide says a Vercel deployment can use a default export from `index.ts` or `src/index.ts`.
+- Vercel's Node.js runtime docs say `src` entry points must default-export a function.
 - Vercel's Node.js runtime docs say TypeScript functions are supported and Node.js `24.x` is currently available.
 
 What to do when you deploy:

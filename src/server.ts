@@ -1,9 +1,10 @@
 import { serve } from '@hono/node-server';
 
-import app from './index.js';
 import { loadRuntimeConfig } from './lib/config.js';
+import { getRuntimeApp } from './runtime.js';
 
 const config = loadRuntimeConfig();
+const app = await getRuntimeApp();
 
 serve(
   {
