@@ -17,6 +17,7 @@
 
 ## Quality
 - Run `npm run verify` after meaningful backend changes.
+- Pull requests against `main` must pass the GitHub Actions `Verify` workflow, which runs `npm run verify`.
 - Run `npm run test:mutation` for changes that materially affect validation, importer mapping, or other core logic covered by the mutation scope.
 - Add integration fixtures for Discogs payload changes before changing importer mapping logic.
 - Preserve backwards-compatible response shapes unless the user asks for a breaking change.
@@ -31,7 +32,9 @@
 - Treat `docs/plans/` as local planning scratch space. Do not commit plan files by default; only commit them when the user explicitly asks for a plan to be preserved in the repository.
 
 ## Commit Strategy
+- Before starting edits, check the current git branch. If it is `main`, pause and ask the user to create or switch to a suitable working branch for the task.
 - Commit in reasonable implementation batches instead of waiting until the very end.
 - Prefer one coherent concern per commit, such as scaffold, importer, API, or tests.
 - Prefix commit messages with the change type, for example `Feature:`, `Chore:`, `Fix:`, or `Refactor:`.
 - Before creating a commit, make sure the batch is coherent and any available checks for that batch have been run.
+- After completing, verifying, and committing a task, include copy-pasteable pull request notes in the chat.
