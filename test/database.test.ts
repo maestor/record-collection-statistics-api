@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { runMigrations } from '../src/db/migrate.js';
-import { openDatabase } from '../src/lib/database.js';
+import { DatabaseClient, openDatabase } from '../src/lib/database.js';
 
 test('openDatabase creates parent directories and exposes local query helpers', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'discogs-db-test-'));
@@ -124,6 +124,70 @@ test('DatabaseClient.withTransaction rolls back failed work and rethrows', async
     database.close();
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('DatabaseClient.withTransaction preserves the callback error when rollback fails', async () => {
+  const database = new DatabaseClient({
+    close() {},
+    protocol: 'file',
+    async execute() {
+      throw new Error('not used');
+    },
+    async executeMultiple() {
+      throw new Error('not used');
+    },
+    async transaction() {
+      return {
+        closed: false,
+        close() {},
+        async commit() {
+          throw new Error('not used');
+        },
+        async execute() {
+          throw new Error('not used');
+        },
+        async executeMultiple() {
+          throw new Error('not used');
+        },
+        async rollback() {
+          throw new Error('rollback failed');
+        },
+      };
+    },
+  } as unknown as ConstructorParameters<typeof DatabaseClient>[0]);
+
+  await assert.rejects(
+    () =>
+      database.withTransaction(async () => {
+        throw new Error('callback failed');
+      }),
+    /callback failed/,
+  );
+});
+
+test('DatabaseClient.close delegates to the underlying client', () => {
+  let closed = false;
+  const database = new DatabaseClient({
+    get protocol() {
+      return 'file';
+    },
+    close() {
+      closed = true;
+    },
+    async execute() {
+      throw new Error('not used');
+    },
+    async executeMultiple() {
+      throw new Error('not used');
+    },
+    async transaction() {
+      throw new Error('not used');
+    },
+  } as unknown as ConstructorParameters<typeof DatabaseClient>[0]);
+
+  database.close();
+
+  assert.equal(closed, true);
 });
 
 test('openDatabase validates required remote database settings before connecting', () => {

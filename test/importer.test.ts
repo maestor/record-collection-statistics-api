@@ -127,6 +127,33 @@ test('DiscogsImporter imports fixture data and is idempotent for fresh releases'
   }
 });
 
+test('DiscogsImporter can run with default clock and no progress callback', async () => {
+  const { database, cleanup } = await createTempDatabase();
+
+  try {
+    const page = readFixture<DiscogsCollectionReleasesPage>(
+      'collection-page-1.json',
+    );
+    page.pagination.pages = 1;
+    page.pagination.items = page.releases.length;
+
+    const repository = new ImportRepository(database);
+    const summary = await new DiscogsImporter({
+      client: createFixtureClient({
+        collectionPages: [page],
+      }),
+      releaseTtlDays: 30,
+      repository,
+    }).run();
+
+    assert.equal(summary.collectionItemsSeen, 2);
+    assert.equal(summary.pagesProcessed, 1);
+    assert.equal(summary.username, 'fixture-user');
+  } finally {
+    cleanup();
+  }
+});
+
 test('DiscogsImporter replaces collection item field values on reimport', async () => {
   const { database, cleanup } = await createTempDatabase();
 
@@ -730,6 +757,86 @@ test('DiscogsClient throws non-retryable API errors without retrying', async () 
       error.message === 'Discogs request failed with status 401: bad token',
   );
   assert.equal(requestCount, 1);
+});
+
+test('DiscogsClient reads collection pages and releases with encoded paths', async () => {
+  const requests: string[] = [];
+  const client = new DiscogsClient({
+    accessToken: 'test-token',
+    userAgent: 'test-agent',
+    baseUrl: 'https://api.discogs.com/',
+    minIntervalMs: 0,
+    fetchImpl: async (input) => {
+      requests.push(String(input));
+
+      if (String(input).includes('/collection/folders/0/releases')) {
+        return new Response(
+          JSON.stringify(readFixture('collection-page-1.json')),
+          {
+            status: 200,
+            headers: {
+              'content-type': 'application/json',
+            },
+          },
+        );
+      }
+
+      return new Response(JSON.stringify(readFixture('release-101.json')), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+        },
+      });
+    },
+  });
+
+  const collectionPage = await client.getCollectionReleases(
+    'space user',
+    2,
+    50,
+  );
+  const release = await client.getRelease(101);
+
+  assert.equal(collectionPage.pagination.page, 1);
+  assert.equal(release.title, 'Northern Lights');
+  assert.deepEqual(requests, [
+    'https://api.discogs.com/users/space%20user/collection/folders/0/releases?page=2&per_page=50',
+    'https://api.discogs.com/releases/101',
+  ]);
+});
+
+test('DiscogsClient waits between successful requests when rate limiting is enabled', async () => {
+  const sleepCalls: number[] = [];
+  let now = 1_000;
+
+  const originalDateNow = Date.now;
+  try {
+    Date.now = () => now;
+    const client = new DiscogsClient({
+      accessToken: 'test-token',
+      userAgent: 'test-agent',
+      baseUrl: 'https://api.discogs.com',
+      minIntervalMs: 25,
+      sleep: async (ms) => {
+        sleepCalls.push(ms);
+        now += ms;
+      },
+      fetchImpl: async () =>
+        new Response(JSON.stringify(readFixture('identity.json')), {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+          },
+        }),
+    });
+
+    await client.getIdentity();
+    await client.getIdentity();
+
+    assert.deepEqual(sleepCalls, [25]);
+  } finally {
+    Date.now = originalDateNow;
+  }
 });
 
 test('DiscogsClient uses default fetch, retry count, and rate-limit sleep when not overridden', async () => {

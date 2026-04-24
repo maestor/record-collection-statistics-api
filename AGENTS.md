@@ -21,6 +21,7 @@
 - Add integration fixtures for Discogs payload changes before changing importer mapping logic.
 - Preserve backwards-compatible response shapes unless the user asks for a breaking change.
 - Keep `npm run verify` fast for routine development, and use `npm run test:mutation` separately when you want the stronger mutation-testing signal.
+- Keep the basic coverage gate strict: line and function coverage should stay at `100%`, with branch coverage kept near the current high-water mark instead of capped loosely.
 - Treat surviving mutants, no-coverage mutants, and timeout mutants as quality failures. A clean mutation run should have `100%` score with `0` survived, `0` no coverage, and `0` timed out.
 - Keep mutation test files ordered from focused and fast to broad and slow, so mutants are killed by the smallest relevant suite before full API integration tests run.
 - For API tests, assert complete public response shapes, important error bodies, cache revalidation behavior, and metadata, not only status codes or one representative field.
