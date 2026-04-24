@@ -253,11 +253,16 @@ test('RecordsRepository applies pagination offsets and maps list item aggregates
       artistsSort: 'Alpha Artist',
       releaseYear: 1999,
       country: 'Finland',
-      lowestPrice: 12.5,
       thumb: 'https://example.test/release-101-thumb.jpg',
       instanceCount: 2,
-      firstDateAdded: '2024-01-10T15:00:00.000Z',
-      latestDateAdded: '2024-03-05T00:00:00.000Z',
+      dateAdded: '2024-01-10T15:00:00.000Z',
+      formats: [
+        {
+          name: 'CD',
+          descriptions: ['Album'],
+          freeText: null,
+        },
+      ],
     });
   } finally {
     seeded.cleanup();
@@ -322,11 +327,10 @@ test('RecordsRepository preserves nullable list and detail fields', async () => 
       artistsSort: null,
       releaseYear: null,
       country: null,
-      lowestPrice: null,
       thumb: null,
       instanceCount: 1,
-      firstDateAdded: '2024-01-02T00:00:00.000Z',
-      latestDateAdded: '2024-01-02T00:00:00.000Z',
+      dateAdded: '2024-01-02T00:00:00.000Z',
+      formats: [],
     });
     assert.ok(detail);
     assert.equal(detail.numForSale, null);
@@ -426,7 +430,7 @@ test('RecordsRepository hydrates full record details in stable order', async () 
     assert.equal(detail.artistsSort, 'Alpha Artist');
     assert.equal(detail.releaseYear, 1999);
     assert.equal(detail.country, 'Finland');
-    assert.equal(detail.lowestPrice, 12.5);
+    assert.equal(detail.dateAdded, '2024-01-10T15:00:00.000Z');
     assert.equal(
       detail.coverImage,
       'https://example.test/release-101-cover.jpg',
@@ -466,8 +470,8 @@ test('RecordsRepository hydrates full record details in stable order', async () 
     assert.deepEqual(detail.formats, [
       {
         name: 'CD',
-        qty: '1',
         descriptions: ['Album'],
+        freeText: null,
       },
     ]);
     assert.deepEqual(detail.identifiers, [

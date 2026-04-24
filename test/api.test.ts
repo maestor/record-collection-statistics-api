@@ -45,7 +45,16 @@ test('GET /records returns paginated release data and stable cache metadata', as
     assert.ok(response.headers.get('etag'));
 
     const payload = (await response.json()) as {
-      data: Array<{ releaseId: number; title: string }>;
+      data: Array<{
+        dateAdded: string | null;
+        formats: Array<{
+          descriptions: string[];
+          freeText: string | null;
+          name: string;
+        }>;
+        releaseId: number;
+        title: string;
+      }>;
       meta: { total: number; totalPages: number };
     };
 
@@ -53,6 +62,14 @@ test('GET /records returns paginated release data and stable cache metadata', as
     assert.equal(payload.meta.totalPages, 2);
     assert.equal(payload.data[0]?.releaseId, 202);
     assert.equal(payload.data[0]?.title, 'Moonlit Session');
+    assert.equal(payload.data[0]?.dateAdded, '2024-02-11T13:30:00.000Z');
+    assert.deepEqual(payload.data[0]?.formats, [
+      {
+        name: 'Vinyl',
+        descriptions: ['LP', 'Album'],
+        freeText: null,
+      },
+    ]);
 
     const secondResponse = await app.request(
       '/records?page_size=1&sort=title&order=asc',
@@ -351,7 +368,12 @@ test('GET /records/:releaseId returns detailed release data with collection fiel
     const payload = (await response.json()) as {
       data: {
         collectionItems: Array<{ fieldValues: Array<{ fieldName: string }> }>;
-        formats: Array<{ name: string }>;
+        dateAdded: string;
+        formats: Array<{
+          descriptions: string[];
+          freeText: string | null;
+          name: string;
+        }>;
         genres: string[];
         labels: Array<{ name: string }>;
         title: string;
@@ -365,7 +387,14 @@ test('GET /records/:releaseId returns detailed release data with collection fiel
       'Media Condition',
     );
     assert.equal(payload.data.labels[0]?.name, 'Aurora Audio');
-    assert.equal(payload.data.formats[0]?.name, 'CD');
+    assert.equal(payload.data.dateAdded, '2024-01-10T15:00:00.000Z');
+    assert.deepEqual(payload.data.formats, [
+      {
+        name: 'CD',
+        descriptions: ['Album'],
+        freeText: null,
+      },
+    ]);
     assert.deepEqual(payload.data.genres, ['Rock']);
 
     const missingResponse = await app.request('/records/999');

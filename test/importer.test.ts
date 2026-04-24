@@ -635,7 +635,6 @@ test('DiscogsImporter handles sparse optional Discogs payloads through the cache
     assert.equal(track?.track_type, 'track');
     assert.match(track?.extraartists_json ?? '', /Guest Artist/);
     assert.equal(sparseDetail?.releaseYear, null);
-    assert.equal(sparseDetail?.lowestPrice, null);
     assert.equal(sparseDetail?.community.have, null);
     assert.deepEqual(sparseDetail?.artists, []);
     assert.deepEqual(sparseDetail?.formats, []);

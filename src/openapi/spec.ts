@@ -25,6 +25,20 @@ const breakdownItemSchema = {
   },
 } as const;
 
+const recordFormatSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['name', 'descriptions', 'freeText'],
+  properties: {
+    name: { type: 'string' },
+    descriptions: {
+      type: 'array',
+      items: { type: 'string' },
+    },
+    freeText: { type: ['string', 'null'] },
+  },
+} as const;
+
 const recordListItemSchema = {
   type: 'object',
   additionalProperties: false,
@@ -34,11 +48,10 @@ const recordListItemSchema = {
     'artistsSort',
     'releaseYear',
     'country',
-    'lowestPrice',
     'thumb',
     'instanceCount',
-    'firstDateAdded',
-    'latestDateAdded',
+    'dateAdded',
+    'formats',
   ],
   properties: {
     releaseId: { type: 'integer' },
@@ -46,11 +59,13 @@ const recordListItemSchema = {
     artistsSort: { type: ['string', 'null'] },
     releaseYear: { type: ['integer', 'null'] },
     country: { type: ['string', 'null'] },
-    lowestPrice: { type: ['number', 'null'] },
     thumb: { type: ['string', 'null'] },
     instanceCount: { type: 'integer' },
-    firstDateAdded: { type: ['string', 'null'], format: 'date-time' },
-    latestDateAdded: { type: ['string', 'null'], format: 'date-time' },
+    dateAdded: { type: ['string', 'null'], format: 'date-time' },
+    formats: {
+      type: 'array',
+      items: recordFormatSchema,
+    },
   },
 } as const;
 
@@ -129,19 +144,7 @@ const recordDetailSchema = {
         },
         formats: {
           type: 'array',
-          items: {
-            type: 'object',
-            additionalProperties: false,
-            required: ['name', 'qty', 'descriptions'],
-            properties: {
-              name: { type: 'string' },
-              qty: { type: ['string', 'null'] },
-              descriptions: {
-                type: 'array',
-                items: { type: 'string' },
-              },
-            },
-          },
+          items: recordFormatSchema,
         },
         identifiers: {
           type: 'array',

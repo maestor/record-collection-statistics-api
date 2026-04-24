@@ -7,10 +7,13 @@ import type { DatabaseClient } from '../lib/database.js';
 export interface RecordListItem {
   artistsSort: string | null;
   country: string | null;
-  firstDateAdded: string | null;
+  dateAdded: string | null;
+  formats: Array<{
+    descriptions: string[];
+    freeText: string | null;
+    name: string;
+  }>;
   instanceCount: number;
-  latestDateAdded: string | null;
-  lowestPrice: number | null;
   releaseId: number;
   releaseYear: number | null;
   thumb: string | null;
@@ -46,8 +49,8 @@ export interface RecordDetail extends RecordListItem {
   fetchedAt: string;
   formats: Array<{
     descriptions: string[];
+    freeText: string | null;
     name: string;
-    qty: string | null;
   }>;
   genres: string[];
   identifiers: Array<{
@@ -161,10 +164,8 @@ export class RecordsRepository {
     const rows = await this.database.queryAll<{
       artists_sort: string | null;
       country: string | null;
-      first_date_added: string | null;
+      date_added: string | null;
       instance_count: number;
-      latest_date_added: string | null;
-      lowest_price: number | null;
       release_id: number;
       release_year: number | null;
       thumb: string | null;
@@ -177,7 +178,6 @@ export class RecordsRepository {
           r.artists_sort,
           r.release_year,
           r.country,
-          r.lowest_price,
           r.thumb,
           (
             SELECT COUNT(*)
@@ -188,12 +188,7 @@ export class RecordsRepository {
             SELECT MIN(ci.date_added)
             FROM collection_items ci
             WHERE ci.release_id = r.release_id
-          ) AS first_date_added,
-          (
-            SELECT MAX(ci.date_added)
-            FROM collection_items ci
-            WHERE ci.release_id = r.release_id
-          ) AS latest_date_added
+          ) AS date_added
         FROM releases r
         WHERE ${whereSql}
         ORDER BY ${sortExpression} ${query.order}, r.release_id ASC
@@ -202,17 +197,20 @@ export class RecordsRepository {
       [...params, query.pageSize, offset],
     );
 
+    const formatsByReleaseId = await this.listFormatsForReleaseIds(
+      rows.map((row) => Number(row.release_id)),
+    );
+
     return rows.map((row) => ({
       releaseId: Number(row.release_id),
       title: row.title,
       artistsSort: row.artists_sort,
       releaseYear: row.release_year === null ? null : Number(row.release_year),
       country: row.country,
-      lowestPrice: row.lowest_price === null ? null : Number(row.lowest_price),
       thumb: row.thumb,
       instanceCount: Number(row.instance_count),
-      firstDateAdded: row.first_date_added,
-      latestDateAdded: row.latest_date_added,
+      dateAdded: row.date_added,
+      formats: formatsByReleaseId.get(Number(row.release_id)) ?? [],
     }));
   }
 
@@ -227,10 +225,8 @@ export class RecordsRepository {
       cover_image: string | null;
       data_quality: string | null;
       fetched_at: string;
-      first_date_added: string | null;
+      date_added: string | null;
       instance_count: number;
-      latest_date_added: string | null;
-      lowest_price: number | null;
       num_for_sale: number | null;
       release_id: number;
       release_year: number | null;
@@ -248,7 +244,6 @@ export class RecordsRepository {
           r.artists_sort,
           r.release_year,
           r.country,
-          r.lowest_price,
           r.thumb,
           r.cover_image,
           r.status,
@@ -271,12 +266,7 @@ export class RecordsRepository {
             SELECT MIN(ci.date_added)
             FROM collection_items ci
             WHERE ci.release_id = r.release_id
-          ) AS first_date_added,
-          (
-            SELECT MAX(ci.date_added)
-            FROM collection_items ci
-            WHERE ci.release_id = r.release_id
-          ) AS latest_date_added
+          ) AS date_added
         FROM releases r
         WHERE r.release_id = ?
           AND EXISTS (
@@ -332,11 +322,11 @@ export class RecordsRepository {
       ),
       this.database.queryAll<{
         descriptions_json: string;
+        format_text: string | null;
         name: string;
-        qty: string | null;
       }>(
         `
-            SELECT name, qty, descriptions_json
+            SELECT name, format_text, descriptions_json
             FROM release_formats
             WHERE release_id = ?
             ORDER BY position ASC
@@ -456,14 +446,9 @@ export class RecordsRepository {
           ? null
           : Number(releaseRow.release_year),
       country: releaseRow.country,
-      lowestPrice:
-        releaseRow.lowest_price === null
-          ? null
-          : Number(releaseRow.lowest_price),
       thumb: releaseRow.thumb,
       instanceCount: Number(releaseRow.instance_count),
-      firstDateAdded: releaseRow.first_date_added,
-      latestDateAdded: releaseRow.latest_date_added,
+      dateAdded: releaseRow.date_added,
       coverImage: releaseRow.cover_image,
       status: releaseRow.status,
       released: releaseRow.released,
@@ -507,7 +492,7 @@ export class RecordsRepository {
       })),
       formats: formats.map((row) => ({
         name: row.name,
-        qty: row.qty,
+        freeText: row.format_text,
         descriptions: JSON.parse(row.descriptions_json) as string[],
       })),
       identifiers: identifiers.map((row) => ({
@@ -525,6 +510,47 @@ export class RecordsRepository {
       styles: styles.map((row) => row.style),
       collectionItems: [...collectionItems.values()],
     };
+  }
+
+  private async listFormatsForReleaseIds(
+    releaseIds: number[],
+  ): Promise<Map<number, RecordListItem['formats']>> {
+    if (releaseIds.length === 0) {
+      return new Map();
+    }
+
+    const placeholders = releaseIds.map(() => '?').join(', ');
+    const rows = await this.database.queryAll<{
+      descriptions_json: string;
+      format_text: string | null;
+      name: string;
+      release_id: number;
+    }>(
+      `
+        SELECT release_id, name, format_text, descriptions_json
+        FROM release_formats
+        WHERE release_id IN (${placeholders})
+        ORDER BY release_id ASC, position ASC
+      `,
+      releaseIds,
+    );
+
+    const formatsByReleaseId = new Map<number, RecordListItem['formats']>();
+
+    for (const row of rows) {
+      const releaseId = Number(row.release_id);
+      const formats = formatsByReleaseId.get(releaseId) ?? [];
+
+      formats.push({
+        name: row.name,
+        freeText: row.format_text,
+        descriptions: JSON.parse(row.descriptions_json) as string[],
+      });
+
+      formatsByReleaseId.set(releaseId, formats);
+    }
+
+    return formatsByReleaseId;
   }
 
   async getStatsSummary(): Promise<StatsSummary> {
