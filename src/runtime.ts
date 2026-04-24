@@ -6,7 +6,9 @@ import type {
   DatabaseConnectionOptions,
 } from './lib/database.js';
 
-type RuntimeApp = Pick<Hono, 'fetch'>;
+// Type-only dependency injection surface; Node coverage can report erased
+// members as uncovered in the TypeScript source map.
+/* node:coverage disable */ type RuntimeApp = Pick<Hono, 'fetch'>;
 
 export interface RuntimeDependencies {
   buildDatabaseConnectionOptions: (
@@ -17,6 +19,7 @@ export interface RuntimeDependencies {
   openDatabase: (options: DatabaseConnectionOptions) => DatabaseClient;
   runMigrations: (database: DatabaseClient) => Promise<void>;
 }
+/* node:coverage enable */
 
 let appPromise: Promise<RuntimeApp> | undefined;
 

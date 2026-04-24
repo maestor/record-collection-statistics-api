@@ -4,6 +4,9 @@ import type { DatabaseConnectionOptions } from './database.js';
 
 loadDotEnv();
 
+// Type-only configuration contracts; Node coverage can map erased interface
+// members back into the TypeScript source.
+/* node:coverage disable */
 export interface RuntimeConfig {
   apiReadKey?: string;
   databasePath: string;
@@ -20,6 +23,7 @@ export interface DiscogsImportConfig extends RuntimeConfig {
   releaseTtlDays: number;
   minIntervalMs: number;
 }
+/* node:coverage enable */
 
 function readStringEnv(
   name: string,

@@ -6,6 +6,9 @@ import type {
 } from '../discogs/types.js';
 import { addDays, toIsoUtc } from '../lib/time.js';
 
+// Type-only mapper contracts; Node coverage can map erased interface members
+// back into the TypeScript source.
+/* node:coverage disable */
 export interface NormalizedCollectionField {
   fieldId: number;
   fieldType: string;
@@ -110,6 +113,7 @@ export interface NormalizedReleaseDetail {
   communityWant: number | null;
   artistsSort: string | null;
 }
+/* node:coverage enable */
 
 export function normalizeCollectionField(
   field: DiscogsCollectionField,
