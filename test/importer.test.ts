@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { DiscogsClient } from '../src/discogs/client.js';
+import { DiscogsApiError, DiscogsClient } from '../src/discogs/client.js';
 import type {
+  DiscogsCollectionFieldsResponse,
+  DiscogsCollectionRelease,
   DiscogsCollectionReleasesPage,
   DiscogsReleaseDetail,
 } from '../src/discogs/types.js';
@@ -11,11 +13,30 @@ import {
   type DiscogsImportProgressEvent,
 } from '../src/importer/discogs-importer.js';
 import { ImportRepository } from '../src/repositories/import-repository.js';
+import { RecordsRepository } from '../src/repositories/records-repository.js';
 import {
   createFixtureClient,
   createTempDatabase,
   readFixture,
 } from './helpers.js';
+
+function createCollectionRelease(
+  releaseId: number,
+  instanceId: number,
+): DiscogsCollectionRelease {
+  return {
+    id: releaseId,
+    instance_id: instanceId,
+    folder_id: 0,
+    date_added: '2026-04-23T10:00:00-07:00',
+    rating: 0,
+    basic_information: {
+      id: releaseId,
+      resource_url: `https://api.discogs.com/releases/${releaseId}`,
+      title: `Release ${releaseId}`,
+    },
+  };
+}
 
 test('DiscogsImporter imports fixture data and is idempotent for fresh releases', async () => {
   const { database, cleanup } = await createTempDatabase();
@@ -192,6 +213,293 @@ test('DiscogsImporter emits progress events for collection sync and release enri
   }
 });
 
+test('DiscogsImporter records failed runs and avoids successful-sync side effects', async () => {
+  const { database, cleanup } = await createTempDatabase();
+
+  try {
+    const repository = new ImportRepository(database);
+    const importer = new DiscogsImporter({
+      client: {
+        ...createFixtureClient(),
+        async getCollectionReleases(_username: string, page: number) {
+          if (page === 2) {
+            throw new Error('Discogs collection page 2 failed');
+          }
+
+          return readFixture<DiscogsCollectionReleasesPage>(
+            'collection-page-1.json',
+          );
+        },
+      },
+      now: () => new Date('2026-04-23T10:00:00.000Z'),
+      releaseTtlDays: 30,
+      repository,
+    });
+
+    await assert.rejects(
+      () => importer.run(),
+      /Discogs collection page 2 failed/,
+    );
+
+    const run = await database.queryOne<{
+      collection_items_seen: number;
+      error_message: string | null;
+      pages_processed: number;
+      status: string;
+    }>('SELECT * FROM sync_runs ORDER BY id DESC LIMIT 1');
+    const stateRows = await database.queryAll<{ key: string }>(
+      'SELECT key FROM sync_state',
+    );
+    const itemCount =
+      (
+        await database.queryOne<{ count: number }>(
+          'SELECT COUNT(*) AS count FROM collection_items',
+        )
+      )?.count ?? 0;
+
+    assert.equal(run?.status, 'failed');
+    assert.equal(run?.error_message, 'Discogs collection page 2 failed');
+    assert.equal(run?.pages_processed, 1);
+    assert.equal(run?.collection_items_seen, 2);
+    assert.equal(itemCount, 2);
+    assert.deepEqual(stateRows, []);
+  } finally {
+    cleanup();
+  }
+});
+
+test('DiscogsImporter uses fallback error text for non-Error failures', async () => {
+  const { database, cleanup } = await createTempDatabase();
+
+  try {
+    const repository = new ImportRepository(database);
+    const importer = new DiscogsImporter({
+      client: {
+        ...createFixtureClient(),
+        async getIdentity() {
+          throw 'discogs exploded';
+        },
+      },
+      now: () => new Date('2026-04-23T10:00:00.000Z'),
+      releaseTtlDays: 30,
+      repository,
+    });
+
+    await assert.rejects(() => importer.run(), /discogs exploded/);
+
+    const run = await database.queryOne<{
+      error_message: string | null;
+      status: string;
+    }>('SELECT status, error_message FROM sync_runs ORDER BY id DESC LIMIT 1');
+
+    assert.equal(run?.status, 'failed');
+    assert.equal(run?.error_message, 'Unknown Discogs import error');
+  } finally {
+    cleanup();
+  }
+});
+
+test('DiscogsImporter full refresh ignores fresh release TTLs', async () => {
+  const { database, cleanup } = await createTempDatabase();
+
+  try {
+    const repository = new ImportRepository(database);
+    await new DiscogsImporter({
+      client: createFixtureClient(),
+      now: () => new Date('2026-04-23T10:00:00.000Z'),
+      releaseTtlDays: 30,
+      repository,
+    }).run();
+
+    const refreshedRelease =
+      readFixture<DiscogsReleaseDetail>('release-202.json');
+    refreshedRelease.title = 'Moonlit Session (Full Refresh)';
+    const summary = await new DiscogsImporter({
+      client: createFixtureClient({
+        releases: {
+          101: readFixture('release-101.json'),
+          202: refreshedRelease,
+        },
+      }),
+      fullRefresh: true,
+      now: () => new Date('2026-04-24T10:00:00.000Z'),
+      releaseTtlDays: 30,
+      repository,
+    }).run();
+    const releaseTitle =
+      (
+        await database.queryOne<{ title: string }>(
+          'SELECT title FROM releases WHERE release_id = 202',
+        )
+      )?.title ?? '';
+
+    assert.equal(summary.releasesRefreshed, 2);
+    assert.equal(releaseTitle, 'Moonlit Session (Full Refresh)');
+  } finally {
+    cleanup();
+  }
+});
+
+test('DiscogsImporter ignores unknown collection note fields', async () => {
+  const { database, cleanup } = await createTempDatabase();
+
+  try {
+    const page = readFixture<DiscogsCollectionReleasesPage>(
+      'collection-page-1.json',
+    );
+    page.releases[0]?.notes?.push({
+      field_id: 999,
+      value: 'Should not be stored',
+    });
+    const fields = readFixture<DiscogsCollectionFieldsResponse>(
+      'collection-fields.json',
+    );
+    fields.fields = fields.fields.filter((field) => field.id !== 999);
+
+    const repository = new ImportRepository(database);
+    await new DiscogsImporter({
+      client: createFixtureClient({
+        collectionPages: [
+          {
+            ...page,
+            pagination: {
+              ...page.pagination,
+              items: page.releases.length,
+              pages: 1,
+            },
+          },
+        ],
+        fields,
+      }),
+      now: () => new Date('2026-04-23T10:00:00.000Z'),
+      releaseTtlDays: 30,
+      repository,
+    }).run();
+
+    const unknownFieldValues = await database.queryAll<{ value_text: string }>(
+      'SELECT value_text FROM collection_item_field_values WHERE field_id = 999',
+    );
+
+    assert.deepEqual(unknownFieldValues, []);
+  } finally {
+    cleanup();
+  }
+});
+
+test('DiscogsImporter handles sparse optional Discogs payloads through the cache boundary', async () => {
+  const { database, cleanup } = await createTempDatabase();
+
+  try {
+    const sparsePage: DiscogsCollectionReleasesPage = {
+      pagination: {
+        page: 1,
+        pages: 1,
+        per_page: 100,
+        items: 2,
+      },
+      releases: [
+        createCollectionRelease(303, 9303),
+        createCollectionRelease(404, 9404),
+      ],
+    };
+    const sparseRelease: DiscogsReleaseDetail = {
+      id: 303,
+      title: 'Sparse Release',
+    };
+    const thumbFallbackRelease: DiscogsReleaseDetail = {
+      id: 404,
+      title: 'Thumb Fallback Release',
+      community: {
+        data_quality: 'Needs Vote',
+      },
+      images: [
+        {
+          resource_url: 'https://example.test/release-404-resource.jpg',
+        },
+      ],
+      thumb: 'https://example.test/release-404-thumb.jpg',
+      tracklist: [
+        {
+          title: 'Untitled',
+          extraartists: [
+            {
+              name: 'Guest Artist',
+            },
+          ],
+        },
+      ],
+    };
+    const repository = new ImportRepository(database);
+    const summary = await new DiscogsImporter({
+      client: createFixtureClient({
+        collectionPages: [sparsePage],
+        fields: {
+          fields: [],
+        },
+        releases: {
+          303: sparseRelease,
+          404: thumbFallbackRelease,
+        },
+      }),
+      now: () => new Date('2026-04-23T10:00:00.000Z'),
+      releaseTtlDays: 30,
+      repository,
+    }).run();
+
+    const sparseRecord = await database.queryOne<{
+      artists_sort: string | null;
+      community_have: number | null;
+      cover_image: string | null;
+      data_quality: string | null;
+      lowest_price: number | null;
+      release_year: number | null;
+      thumb: string | null;
+    }>('SELECT * FROM releases WHERE release_id = 303');
+    const fallbackRecord = await database.queryOne<{
+      cover_image: string | null;
+      data_quality: string | null;
+    }>('SELECT cover_image, data_quality FROM releases WHERE release_id = 404');
+    const track = await database.queryOne<{
+      extraartists_json: string;
+      track_position: string | null;
+      track_type: string;
+    }>('SELECT * FROM release_tracks WHERE release_id = 404');
+    const recordsRepository = new RecordsRepository(database);
+    const sparseDetail = await recordsRepository.getRecordDetail(303);
+    const fallbackDetail = await recordsRepository.getRecordDetail(404);
+
+    assert.equal(summary.collectionItemsSeen, 2);
+    assert.equal(sparseRecord?.artists_sort, null);
+    assert.equal(sparseRecord?.release_year, null);
+    assert.equal(sparseRecord?.data_quality, null);
+    assert.equal(sparseRecord?.community_have, null);
+    assert.equal(sparseRecord?.lowest_price, null);
+    assert.equal(sparseRecord?.cover_image, null);
+    assert.equal(sparseRecord?.thumb, null);
+    assert.equal(
+      fallbackRecord?.cover_image,
+      'https://example.test/release-404-thumb.jpg',
+    );
+    assert.equal(fallbackRecord?.data_quality, 'Needs Vote');
+    assert.equal(track?.track_position, null);
+    assert.equal(track?.track_type, 'track');
+    assert.match(track?.extraartists_json ?? '', /Guest Artist/);
+    assert.equal(sparseDetail?.releaseYear, null);
+    assert.equal(sparseDetail?.lowestPrice, null);
+    assert.equal(sparseDetail?.community.have, null);
+    assert.deepEqual(sparseDetail?.artists, []);
+    assert.deepEqual(sparseDetail?.formats, []);
+    assert.deepEqual(sparseDetail?.collectionItems[0]?.fieldValues, []);
+    assert.equal(
+      fallbackDetail?.coverImage,
+      'https://example.test/release-404-thumb.jpg',
+    );
+    assert.equal(fallbackDetail?.tracks[0]?.position, null);
+  } finally {
+    cleanup();
+  }
+});
+
 test('DiscogsClient retries transient rate-limit responses with bounded backoff', async () => {
   const sleepCalls: number[] = [];
   let requestCount = 0;
@@ -229,4 +537,74 @@ test('DiscogsClient retries transient rate-limit responses with bounded backoff'
   assert.equal(identity.username, 'fixture-user');
   assert.deepEqual(sleepCalls, [250]);
   assert.equal(requestCount, 2);
+});
+
+test('DiscogsClient retries server errors with exponential fallback delays', async () => {
+  const sleepCalls: number[] = [];
+  let requestCount = 0;
+
+  const client = new DiscogsClient({
+    accessToken: 'test-token',
+    userAgent: 'test-agent',
+    baseUrl: 'https://api.discogs.com/',
+    minIntervalMs: 0,
+    sleep: async (ms) => {
+      sleepCalls.push(ms);
+    },
+    fetchImpl: async (input, init) => {
+      requestCount += 1;
+      const headers = new Headers(init?.headers);
+      assert.equal(input, 'https://api.discogs.com/oauth/identity');
+      assert.equal(headers.get('authorization'), 'Discogs token=test-token');
+      assert.equal(headers.get('user-agent'), 'test-agent');
+      assert.equal(headers.get('accept'), 'application/json');
+
+      if (requestCount < 3) {
+        return new Response('temporary outage', {
+          status: 503,
+          headers: {
+            'retry-after': 'not-a-number',
+          },
+        });
+      }
+
+      return new Response(JSON.stringify(readFixture('identity.json')), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+        },
+      });
+    },
+  });
+
+  const identity = await client.getIdentity();
+  assert.equal(identity.username, 'fixture-user');
+  assert.deepEqual(sleepCalls, [1000, 2000]);
+  assert.equal(requestCount, 3);
+});
+
+test('DiscogsClient throws non-retryable API errors without retrying', async () => {
+  let requestCount = 0;
+
+  const client = new DiscogsClient({
+    accessToken: 'test-token',
+    userAgent: 'test-agent',
+    baseUrl: 'https://api.discogs.com',
+    minIntervalMs: 0,
+    fetchImpl: async () => {
+      requestCount += 1;
+      return new Response('bad token', {
+        status: 401,
+      });
+    },
+  });
+
+  await assert.rejects(
+    () => client.getCollectionFields('space user'),
+    (error) =>
+      error instanceof DiscogsApiError &&
+      error.status === 401 &&
+      error.message === 'Discogs request failed with status 401: bad token',
+  );
+  assert.equal(requestCount, 1);
 });
