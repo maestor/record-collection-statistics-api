@@ -6,6 +6,7 @@ import { runMigrations } from '../src/db/migrate.js';
 import type {
   DiscogsCollectionFieldsResponse,
   DiscogsCollectionReleasesPage,
+  DiscogsCollectionValue,
   DiscogsIdentity,
   DiscogsReleaseDetail,
 } from '../src/discogs/types.js';
@@ -43,6 +44,7 @@ export async function createTempDatabase(): Promise<{
 
 export function createFixtureClient(overrides?: {
   collectionPages?: DiscogsCollectionReleasesPage[];
+  collectionValue?: DiscogsCollectionValue;
   identity?: DiscogsIdentity;
   fields?: DiscogsCollectionFieldsResponse;
   releases?: Record<number, DiscogsReleaseDetail>;
@@ -56,6 +58,9 @@ export function createFixtureClient(overrides?: {
     readFixture<DiscogsCollectionReleasesPage>('collection-page-1.json'),
     readFixture<DiscogsCollectionReleasesPage>('collection-page-2.json'),
   ];
+  const collectionValue =
+    overrides?.collectionValue ??
+    readFixture<DiscogsCollectionValue>('collection-value.json');
   const releases = overrides?.releases ?? {
     101: readFixture<DiscogsReleaseDetail>('release-101.json'),
     202: readFixture<DiscogsReleaseDetail>('release-202.json'),
@@ -75,6 +80,9 @@ export function createFixtureClient(overrides?: {
       }
 
       return response;
+    },
+    async getCollectionValue() {
+      return collectionValue;
     },
     async getRelease(releaseId: number) {
       const response = releases[releaseId];

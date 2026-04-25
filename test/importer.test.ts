@@ -80,6 +80,9 @@ test('DiscogsImporter imports fixture data and is idempotent for fresh releases'
     assert.equal(countsAfterFirstRun?.field_value_count, 4);
 
     const firstRunRecord = await database.queryOne<{
+      collection_value_maximum: number | null;
+      collection_value_median: number | null;
+      collection_value_minimum: number | null;
       completed_at: string | null;
       error_message: string | null;
       releases_refreshed: number;
@@ -95,6 +98,9 @@ test('DiscogsImporter imports fixture data and is idempotent for fresh releases'
     assert.equal(firstRunRecord?.error_message, null);
     assert.equal(firstRunRecord?.releases_refreshed, 2);
     assert.equal(firstRunRecord?.username, 'fixture-user');
+    assert.equal(firstRunRecord?.collection_value_minimum, 41.75);
+    assert.equal(firstRunRecord?.collection_value_median, 58.5);
+    assert.equal(firstRunRecord?.collection_value_maximum, 72.25);
     assert.equal(usernameState?.value, 'fixture-user');
 
     const secondRun = await importer.run();
@@ -780,6 +786,18 @@ test('DiscogsClient reads collection pages and releases with encoded paths', asy
         );
       }
 
+      if (String(input).includes('/collection/value')) {
+        return new Response(
+          JSON.stringify(readFixture('collection-value.json')),
+          {
+            status: 200,
+            headers: {
+              'content-type': 'application/json',
+            },
+          },
+        );
+      }
+
       return new Response(JSON.stringify(readFixture('release-101.json')), {
         status: 200,
         headers: {
@@ -794,12 +812,15 @@ test('DiscogsClient reads collection pages and releases with encoded paths', asy
     2,
     50,
   );
+  const collectionValue = await client.getCollectionValue('space user');
   const release = await client.getRelease(101);
 
   assert.equal(collectionPage.pagination.page, 1);
+  assert.equal(collectionValue.minimum, '$41.75');
   assert.equal(release.title, 'Northern Lights');
   assert.deepEqual(requests, [
     'https://api.discogs.com/users/space%20user/collection/folders/0/releases?page=2&per_page=50',
+    'https://api.discogs.com/users/space%20user/collection/value',
     'https://api.discogs.com/releases/101',
   ]);
 });

@@ -123,3 +123,11 @@ export function buildDatabaseConnectionOptions(
       : {}),
   };
 }
+
+export function describeDatabaseTarget(config: RuntimeConfig): string {
+  if (config.useRemoteDb) {
+    return `remote database (${config.tursoDatabaseUrl ?? 'unknown url'})`;
+  }
+
+  return `local database (${config.databasePath})`;
+}

@@ -31,6 +31,11 @@ test('copyDatabaseContents bootstraps a fresh target database from local data', 
     assert.equal(summary.rowsCopied, totalRowsByTable);
     assert.equal(stats.totals.collectionItems, 3);
     assert.equal(stats.totals.releases, 2);
+    assert.deepEqual(stats.collectionValue, {
+      minimum: 41.75,
+      median: 58.5,
+      maximum: 72.25,
+    });
     assert.equal(record?.title, 'Northern Lights');
     assert.equal(record?.collectionItems.length, 2);
     assert.equal(health.lastSuccessfulSyncAt, '2026-04-23T10:00:00.000Z');
@@ -64,6 +69,11 @@ test('copyDatabaseContents replaces existing target rows when the source cache i
     assert.equal(summary.rowsCopied, totalRowsByTable);
     assert.equal(stats.totals.collectionItems, 0);
     assert.equal(stats.totals.releases, 0);
+    assert.deepEqual(stats.collectionValue, {
+      minimum: null,
+      median: null,
+      maximum: null,
+    });
     assert.equal(health.lastSuccessfulSyncAt, null);
     assert.equal(await repository.getRecordDetail(101), null);
   } finally {

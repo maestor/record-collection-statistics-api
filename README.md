@@ -27,7 +27,7 @@ Local-first backend for importing a Discogs collection into SQLite and serving a
 - `npm run db:migrate` applies SQL migrations to the active database target
 - `npm run db:copy-to-remote -- --force` copies the current local SQLite data into Turso as a one-time bootstrap
 - `npm run import:discogs` syncs the Discogs collection and refreshes stale release details
-- The importer prints progress to `stderr` during long runs and keeps the final JSON summary on `stdout`
+- The importer prints the target database and progress to `stderr`, and keeps the final JSON summary on `stdout`
 - `npm run dev` starts the local read-only API
 - `vercel dev` runs the same app through Vercel's local runtime when you want to test the deployment shape
 - `npm run test` runs integration-style tests
@@ -70,6 +70,7 @@ The dedicated `db:copy-to-remote` command always copies from the local SQLite fi
 The API returns cache headers and ETags for read responses. Validation errors return `400`.
 When `API_READ_KEY` is configured, non-local requests require an API key and return `401` if it is missing or invalid.
 The OpenAPI document is exposed at `GET /openapi.json` for consumers that want to generate client types or SDKs on their own side.
+`GET /stats/summary` includes collection totals, numeric collection value fields, and first/last added timestamps from the latest successful cached import.
 
 ## Import Strategy
 - Sync collection rows from Discogs folder `0` in pages of `100`

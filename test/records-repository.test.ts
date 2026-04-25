@@ -427,11 +427,17 @@ test('RecordsRepository excludes releases that are not in the collection cache',
     const repository = new RecordsRepository(seeded.database);
     const query = recordsQuery({ q: 'Archive Only' });
     const summary = await repository.getStatsSummary();
+    const catalog = await repository.getFilterCatalog(10);
 
     assert.equal(await repository.countRecords(query), 0);
     assert.deepEqual(await repository.listRecords(query), []);
     assert.equal(await repository.getRecordDetail(909), null);
-    assert.deepEqual(summary.releaseYearRange, { min: 1999, max: 2005 });
+    assert.deepEqual(summary.collectionValue, {
+      minimum: 41.75,
+      median: 58.5,
+      maximum: 72.25,
+    });
+    assert.deepEqual(catalog.ranges.releaseYears, { min: 1999, max: 2005 });
   } finally {
     seeded.cleanup();
   }
@@ -588,9 +594,10 @@ test('RecordsRepository returns complete summary and breakdown dimensions', asyn
         first: '2024-01-10T15:00:00.000Z',
         last: '2024-03-05T00:00:00.000Z',
       },
-      releaseYearRange: {
-        min: 1999,
-        max: 2005,
+      collectionValue: {
+        minimum: 41.75,
+        median: 58.5,
+        maximum: 72.25,
       },
     });
 
@@ -762,9 +769,10 @@ test('RecordsRepository returns empty-cache defaults', async () => {
         first: null,
         last: null,
       },
-      releaseYearRange: {
-        min: null,
-        max: null,
+      collectionValue: {
+        minimum: null,
+        median: null,
+        maximum: null,
       },
     });
     assert.deepEqual(await repository.getBreakdown('artist'), []);

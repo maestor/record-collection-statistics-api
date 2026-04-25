@@ -83,9 +83,10 @@ export interface StatsSummary {
     first: string | null;
     last: string | null;
   };
-  releaseYearRange: {
-    max: number | null;
-    min: number | null;
+  collectionValue: {
+    maximum: number | null;
+    median: number | null;
+    minimum: number | null;
   };
   totals: {
     collectionItems: number;
@@ -101,6 +102,11 @@ export interface BreakdownItem {
   itemCount: number;
   releaseCount: number;
   value: string;
+}
+
+interface ReleaseYearRange {
+  max: number | null;
+  min: number | null;
 }
 
 export interface FilterCatalog {
@@ -197,9 +203,8 @@ export class RecordsRepository {
       [...params, query.pageSize, offset],
     );
 
-    const formatsByReleaseId = await this.listFormatsForReleaseIds(
-      rows.map((row) => Number(row.release_id)),
-    );
+    const releaseIds = rows.map((row) => Number(row.release_id));
+    const formatsByReleaseId = await this.listFormatsForReleaseIds(releaseIds);
 
     return rows.map((row) => ({
       releaseId: Number(row.release_id),
@@ -515,11 +520,9 @@ export class RecordsRepository {
   private async listFormatsForReleaseIds(
     releaseIds: number[],
   ): Promise<Map<number, RecordListItem['formats']>> {
-    if (releaseIds.length === 0) {
-      return new Map();
-    }
-
-    const placeholders = releaseIds.map(() => '?').join(', ');
+    // Adding NULL keeps the IN clause valid for empty input without changing
+    // results for real positive Discogs release ids.
+    const placeholders = [...releaseIds.map(() => '?'), 'NULL'].join(', ');
     const rows = await this.database.queryAll<{
       descriptions_json: string;
       format_text: string | null;
@@ -555,10 +558,11 @@ export class RecordsRepository {
 
   async getStatsSummary(): Promise<StatsSummary> {
     const row = await this.database.queryOne<{
+      collection_value_maximum: number | null;
+      collection_value_median: number | null;
+      collection_value_minimum: number | null;
       first_added_at: string | null;
       last_added_at: string | null;
-      max_release_year: number | null;
-      min_release_year: number | null;
       total_genres: number;
       total_items: number;
       total_labels: number;
@@ -576,19 +580,26 @@ export class RecordsRepository {
         (SELECT MIN(date_added) FROM collection_items) AS first_added_at,
         (SELECT MAX(date_added) FROM collection_items) AS last_added_at,
         (
-          SELECT MIN(release_year)
-          FROM releases r
-          WHERE EXISTS (
-            SELECT 1 FROM collection_items ci WHERE ci.release_id = r.release_id
-          )
-        ) AS min_release_year,
+          SELECT collection_value_minimum
+          FROM sync_runs
+          WHERE status = 'succeeded'
+          ORDER BY id DESC
+          LIMIT 1
+        ) AS collection_value_minimum,
         (
-          SELECT MAX(release_year)
-          FROM releases r
-          WHERE EXISTS (
-            SELECT 1 FROM collection_items ci WHERE ci.release_id = r.release_id
-          )
-        ) AS max_release_year
+          SELECT collection_value_median
+          FROM sync_runs
+          WHERE status = 'succeeded'
+          ORDER BY id DESC
+          LIMIT 1
+        ) AS collection_value_median,
+        (
+          SELECT collection_value_maximum
+          FROM sync_runs
+          WHERE status = 'succeeded'
+          ORDER BY id DESC
+          LIMIT 1
+        ) AS collection_value_maximum
     `);
 
     return {
@@ -604,11 +615,19 @@ export class RecordsRepository {
         first: row?.first_added_at ?? null,
         last: row?.last_added_at ?? null,
       },
-      releaseYearRange: {
-        min:
-          row?.min_release_year === null ? null : Number(row?.min_release_year),
-        max:
-          row?.max_release_year === null ? null : Number(row?.max_release_year),
+      collectionValue: {
+        minimum:
+          row?.collection_value_minimum === null
+            ? null
+            : Number(row?.collection_value_minimum),
+        median:
+          row?.collection_value_median === null
+            ? null
+            : Number(row?.collection_value_median),
+        maximum:
+          row?.collection_value_maximum === null
+            ? null
+            : Number(row?.collection_value_maximum),
       },
     };
   }
@@ -643,9 +662,9 @@ export class RecordsRepository {
   }
 
   async getFilterCatalog(limit: number): Promise<FilterCatalog> {
-    const summary = await this.getStatsSummary();
-
     const [
+      summary,
+      releaseYearRange,
       artists,
       labels,
       formats,
@@ -655,6 +674,8 @@ export class RecordsRepository {
       releaseYears,
       addedYears,
     ] = await Promise.all([
+      this.getStatsSummary(),
+      this.getReleaseYearRange(),
       this.getBreakdown('artist', { limit }),
       this.getBreakdown('label', { limit }),
       this.getBreakdown('format', { limit }),
@@ -676,7 +697,7 @@ export class RecordsRepository {
       addedYears,
       ranges: {
         added: summary.addedRange,
-        releaseYears: summary.releaseYearRange,
+        releaseYears: releaseYearRange,
       },
     };
   }
@@ -739,6 +760,36 @@ export class RecordsRepository {
       lastSuccessfulSyncAt,
       totalItems: Number(totals?.total_items ?? 0),
       releaseCount: Number(totals?.release_count ?? 0),
+    };
+  }
+
+  private async getReleaseYearRange(): Promise<ReleaseYearRange> {
+    const row = await this.database.queryOne<{
+      max_release_year: number | null;
+      min_release_year: number | null;
+    }>(`
+      SELECT
+        (
+          SELECT MIN(release_year)
+          FROM releases r
+          WHERE EXISTS (
+            SELECT 1 FROM collection_items ci WHERE ci.release_id = r.release_id
+          )
+        ) AS min_release_year,
+        (
+          SELECT MAX(release_year)
+          FROM releases r
+          WHERE EXISTS (
+            SELECT 1 FROM collection_items ci WHERE ci.release_id = r.release_id
+          )
+        ) AS max_release_year
+    `);
+
+    return {
+      min:
+        row?.min_release_year === null ? null : Number(row?.min_release_year),
+      max:
+        row?.max_release_year === null ? null : Number(row?.max_release_year),
     };
   }
 }

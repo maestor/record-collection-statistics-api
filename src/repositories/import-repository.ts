@@ -2,6 +2,7 @@ import type {
   NormalizedCollectionField,
   NormalizedCollectionFieldValue,
   NormalizedCollectionItem,
+  NormalizedCollectionValue,
   NormalizedReleaseDetail,
 } from '../importer/mappers.js';
 import type { DatabaseClient } from '../lib/database.js';
@@ -185,6 +186,23 @@ export class ImportRepository {
         values.releasesRefreshedDelta ?? 0,
         runId,
       ],
+    );
+  }
+
+  async setRunCollectionValue(
+    runId: number,
+    value: NormalizedCollectionValue,
+  ): Promise<void> {
+    await this.database.execute(
+      `
+        UPDATE sync_runs
+        SET
+          collection_value_minimum = ?,
+          collection_value_median = ?,
+          collection_value_maximum = ?
+        WHERE id = ?
+      `,
+      [value.minimum, value.median, value.maximum, runId],
     );
   }
 
