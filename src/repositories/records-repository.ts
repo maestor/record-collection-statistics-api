@@ -790,9 +790,18 @@ function buildRecordFilters(query: RecordsQueryInput): {
           WHERE rl.release_id = r.release_id
             AND rl.name LIKE ? ESCAPE '\\' COLLATE NOCASE
         )
+        OR EXISTS (
+          SELECT 1
+          FROM release_formats rf
+          WHERE rf.release_id = r.release_id
+            AND (
+              rf.descriptions_json LIKE ? ESCAPE '\\' COLLATE NOCASE
+              OR rf.format_text LIKE ? ESCAPE '\\' COLLATE NOCASE
+            )
+        )
       )
     `);
-    params.push(likeValue, likeValue, likeValue);
+    params.push(likeValue, likeValue, likeValue, likeValue, likeValue);
   }
 
   if (query.artist) {

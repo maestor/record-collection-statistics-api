@@ -206,6 +206,14 @@ test('GET /openapi.json exposes the OpenAPI document', async () => {
     assert.ok(payload.paths['/records']);
     assert.ok(payload.paths['/openapi.json']);
     assert.ok(payload.components.schemas.RecordDetail);
+    assert.equal(
+      (
+        payload.paths['/records'] as {
+          get: { parameters: Array<{ description?: string; name: string }> };
+        }
+      ).get.parameters.find((parameter) => parameter.name === 'q')?.description,
+      'Case-insensitive free-text match against title, artist, label, format descriptions, and format free text.',
+    );
 
     const invalidResponse = await app.request('/openapi.json?limit=1');
     assert.equal(invalidResponse.status, 400);
@@ -296,12 +304,26 @@ test('non-local requests fail closed when API key is not configured', async () =
   }
 });
 
-test('GET /records validates sort options and supports artist filtering', async () => {
+test('GET /records validates sort options and supports artist and format text filtering', async () => {
   const seeded = await seedFixtureImport({
     now: () => new Date('2026-04-23T10:00:00.000Z'),
   });
 
   try {
+    await seeded.database.execute(
+      `
+        INSERT INTO release_formats (
+          release_id,
+          position,
+          name,
+          qty,
+          format_text,
+          descriptions_json
+        ) VALUES (?, ?, ?, ?, ?, ?)
+      `,
+      [202, 1, 'Vinyl', '1', 'Test Pressing', '["Promo"]'],
+    );
+
     const app = createApp(seeded.database);
 
     const filteredResponse = await app.request(
@@ -314,6 +336,28 @@ test('GET /records validates sort options and supports artist filtering', async 
     assert.equal(filteredPayload.data.length, 1);
     assert.equal(filteredPayload.data[0]?.releaseId, 101);
     assert.equal(filteredPayload.data[0]?.instanceCount, 2);
+
+    const descriptionQueryResponse = await app.request('/records?q=Promo');
+    assert.equal(descriptionQueryResponse.status, 200);
+    const descriptionQueryPayload = (await descriptionQueryResponse.json()) as {
+      data: Array<{ releaseId: number }>;
+    };
+    assert.deepEqual(
+      descriptionQueryPayload.data.map((record) => record.releaseId),
+      [202],
+    );
+
+    const freeTextQueryResponse = await app.request(
+      '/records?q=Test%20Pressing',
+    );
+    assert.equal(freeTextQueryResponse.status, 200);
+    const freeTextQueryPayload = (await freeTextQueryResponse.json()) as {
+      data: Array<{ releaseId: number }>;
+    };
+    assert.deepEqual(
+      freeTextQueryPayload.data.map((record) => record.releaseId),
+      [202],
+    );
 
     const invalidResponse = await app.request('/records?sort=unknown');
     assert.equal(invalidResponse.status, 400);
