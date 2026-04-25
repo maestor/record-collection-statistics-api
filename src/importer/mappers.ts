@@ -2,6 +2,7 @@ import type {
   DiscogsCollectionField,
   DiscogsCollectionFieldValue,
   DiscogsCollectionRelease,
+  DiscogsCollectionValue,
   DiscogsReleaseDetail,
 } from '../discogs/types.js';
 import { addDays, toIsoUtc } from '../lib/time.js';
@@ -39,6 +40,12 @@ export interface NormalizedCollectionFieldValue {
   rawJson: string;
   updatedAt: string;
   valueText: string;
+}
+
+export interface NormalizedCollectionValue {
+  maximum: number | null;
+  median: number | null;
+  minimum: number | null;
 }
 
 export interface NormalizedReleaseDetail {
@@ -169,6 +176,16 @@ export function normalizeCollectionFieldValue(
   };
 }
 
+export function normalizeCollectionValue(
+  value: DiscogsCollectionValue,
+): NormalizedCollectionValue {
+  return {
+    maximum: parseOptionalCurrencyValue(value.maximum),
+    median: parseOptionalCurrencyValue(value.median),
+    minimum: parseOptionalCurrencyValue(value.minimum),
+  };
+}
+
 export function normalizeReleaseDetail(
   release: DiscogsReleaseDetail,
   fetchedAt: string,
@@ -249,4 +266,32 @@ export function normalizeReleaseDetail(
         extraartistsJson: JSON.stringify(track.extraartists ?? []),
       })) ?? [],
   };
+}
+
+function parseOptionalCurrencyValue(value: string | undefined): number | null {
+  const normalized = value?.replace(/[^\d,.-]/g, '');
+  if (!normalized) {
+    return null;
+  }
+
+  const separatorIndex = Math.max(
+    normalized.lastIndexOf(','),
+    normalized.lastIndexOf('.'),
+  );
+  if (separatorIndex === -1) {
+    const parsedInteger = Number(normalized);
+    return Number.isFinite(parsedInteger) ? parsedInteger : null;
+  }
+
+  const fractionalPart = normalized.slice(separatorIndex + 1);
+  if (/^\d{1,2}$/.test(fractionalPart)) {
+    const integerPart = normalized
+      .slice(0, separatorIndex)
+      .replace(/[.,]/g, '');
+    const parsedDecimal = Number(`${integerPart}.${fractionalPart}`);
+    return Number.isFinite(parsedDecimal) ? parsedDecimal : null;
+  }
+
+  const parsedWhole = Number(normalized.replace(/[.,]/g, ''));
+  return Number.isFinite(parsedWhole) ? parsedWhole : null;
 }

@@ -1,6 +1,7 @@
 import type {
   DiscogsCollectionFieldsResponse,
   DiscogsCollectionReleasesPage,
+  DiscogsCollectionValue,
   DiscogsIdentity,
   DiscogsReleaseDetail,
 } from './types.js';
@@ -70,6 +71,12 @@ export class DiscogsClient {
       `/users/${encodeURIComponent(
         username,
       )}/collection/folders/0/releases?page=${page}&per_page=${perPage}`,
+    );
+  }
+
+  async getCollectionValue(username: string): Promise<DiscogsCollectionValue> {
+    return this.requestJson<DiscogsCollectionValue>(
+      `/users/${encodeURIComponent(username)}/collection/value`,
     );
   }
 

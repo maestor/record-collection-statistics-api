@@ -228,7 +228,10 @@ test('runMigrations is idempotent after applying the schema once', async () => {
       'SELECT COUNT(*) AS count FROM releases',
     );
 
-    assert.deepEqual(migrations, [{ name: '001_initial.sql' }]);
+    assert.deepEqual(migrations, [
+      { name: '001_initial.sql' },
+      { name: '002_add_collection_value_to_sync_runs.sql' },
+    ]);
     assert.equal(releaseCount?.count, 0);
   } finally {
     database.close();

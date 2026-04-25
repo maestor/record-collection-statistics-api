@@ -222,7 +222,7 @@ const recordDetailSchema = {
 const statsSummarySchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['totals', 'addedRange', 'releaseYearRange'],
+  required: ['totals', 'addedRange', 'collectionValue'],
   properties: {
     totals: {
       type: 'object',
@@ -253,13 +253,14 @@ const statsSummarySchema = {
         last: { type: ['string', 'null'], format: 'date-time' },
       },
     },
-    releaseYearRange: {
+    collectionValue: {
       type: 'object',
       additionalProperties: false,
-      required: ['min', 'max'],
+      required: ['minimum', 'median', 'maximum'],
       properties: {
-        min: { type: ['integer', 'null'] },
-        max: { type: ['integer', 'null'] },
+        minimum: { type: ['number', 'null'] },
+        median: { type: ['number', 'null'] },
+        maximum: { type: ['number', 'null'] },
       },
     },
   },

@@ -6,12 +6,18 @@ import {
 } from '../importer/discogs-importer.js';
 import {
   buildDatabaseConnectionOptions,
+  describeDatabaseTarget,
   loadDiscogsImportConfig,
 } from '../lib/config.js';
 import { openDatabase } from '../lib/database.js';
 import { ImportRepository } from '../repositories/import-repository.js';
 
 const config = loadDiscogsImportConfig();
+
+console.error(
+  `[discogs-import] Target database: ${describeDatabaseTarget(config)}`,
+);
+
 const database = openDatabase(buildDatabaseConnectionOptions(config));
 await runMigrations(database);
 

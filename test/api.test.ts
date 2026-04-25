@@ -206,6 +206,30 @@ test('GET /openapi.json exposes the OpenAPI document', async () => {
     assert.ok(payload.paths['/records']);
     assert.ok(payload.paths['/openapi.json']);
     assert.ok(payload.components.schemas.RecordDetail);
+    assert.deepEqual(
+      (
+        payload.components.schemas.StatsSummary as {
+          properties: Record<string, unknown>;
+          required: string[];
+        }
+      ).required,
+      ['totals', 'addedRange', 'collectionValue'],
+    );
+    assert.ok(
+      (
+        payload.components.schemas.StatsSummary as {
+          properties: Record<string, unknown>;
+        }
+      ).properties.collectionValue,
+    );
+    assert.equal(
+      (
+        payload.components.schemas.StatsSummary as {
+          properties: Record<string, unknown>;
+        }
+      ).properties.releaseYearRange,
+      undefined,
+    );
     assert.equal(
       (
         payload.paths['/records'] as {
@@ -463,16 +487,44 @@ test('stats endpoints return collection summary and breakdowns', async () => {
     assert.equal(summaryResponse.status, 200);
     const summaryPayload = (await summaryResponse.json()) as {
       data: {
+        addedRange: {
+          first: string | null;
+          last: string | null;
+        };
+        collectionValue: {
+          maximum: number | null;
+          median: number | null;
+          minimum: number | null;
+        };
         totals: {
           collectionItems: number;
+          genres: number;
+          labels: number;
           releases: number;
+          styles: number;
           uniqueArtists: number;
         };
       };
     };
-    assert.equal(summaryPayload.data.totals.collectionItems, 3);
-    assert.equal(summaryPayload.data.totals.releases, 2);
-    assert.equal(summaryPayload.data.totals.uniqueArtists, 2);
+    assert.deepEqual(summaryPayload.data, {
+      totals: {
+        collectionItems: 3,
+        releases: 2,
+        uniqueArtists: 2,
+        labels: 2,
+        genres: 2,
+        styles: 2,
+      },
+      addedRange: {
+        first: '2024-01-10T15:00:00.000Z',
+        last: '2024-03-05T00:00:00.000Z',
+      },
+      collectionValue: {
+        minimum: 41.75,
+        median: 58.5,
+        maximum: 72.25,
+      },
+    });
 
     const breakdownResponse = await app.request('/stats/breakdowns/artist');
     assert.equal(breakdownResponse.status, 200);
@@ -513,6 +565,11 @@ test('GET /stats/dashboard returns summary plus top breakdowns', async () => {
         labels: Array<{ value: string }>;
         styles: Array<{ value: string }>;
         summary: {
+          collectionValue: {
+            maximum: number | null;
+            median: number | null;
+            minimum: number | null;
+          };
           totals: {
             collectionItems: number;
             releases: number;
@@ -526,6 +583,11 @@ test('GET /stats/dashboard returns summary plus top breakdowns', async () => {
     assert.equal(payload.meta.limit, 1);
     assert.equal(payload.data.summary.totals.collectionItems, 3);
     assert.equal(payload.data.summary.totals.releases, 2);
+    assert.deepEqual(payload.data.summary.collectionValue, {
+      minimum: 41.75,
+      median: 58.5,
+      maximum: 72.25,
+    });
     assert.deepEqual(payload.data.topArtists, [
       {
         value: 'Alpha Artist',

@@ -80,6 +80,12 @@ export interface DiscogsCollectionFieldsResponse {
   fields: DiscogsCollectionField[];
 }
 
+export interface DiscogsCollectionValue {
+  maximum?: string;
+  median?: string;
+  minimum?: string;
+}
+
 export interface DiscogsReleaseArtist {
   name: string;
   anv?: string;

@@ -8,6 +8,7 @@ import {
   normalizeCollectionField,
   normalizeCollectionFieldValue,
   normalizeCollectionItem,
+  normalizeCollectionValue,
   normalizeReleaseDetail,
 } from './mappers.js';
 
@@ -17,6 +18,7 @@ export interface DiscogsImporterOptions {
     | 'getIdentity'
     | 'getCollectionFields'
     | 'getCollectionReleases'
+    | 'getCollectionValue'
     | 'getRelease'
   >;
   fullRefresh?: boolean;
@@ -88,6 +90,7 @@ export class DiscogsImporter {
     | 'getIdentity'
     | 'getCollectionFields'
     | 'getCollectionReleases'
+    | 'getCollectionValue'
     | 'getRelease'
   >;
   private readonly fullRefresh: boolean;
@@ -126,13 +129,18 @@ export class DiscogsImporter {
         username: identity.username,
       });
 
-      const fieldsResponse = await this.client.getCollectionFields(
-        identity.username,
-      );
+      const [fieldsResponse, collectionValue] = await Promise.all([
+        this.client.getCollectionFields(identity.username),
+        this.client.getCollectionValue(identity.username),
+      ]);
       await this.repository.upsertCollectionFields(
         fieldsResponse.fields.map((field) =>
           normalizeCollectionField(field, this.now().toISOString()),
         ),
+      );
+      await this.repository.setRunCollectionValue(
+        syncRun.id,
+        normalizeCollectionValue(collectionValue),
       );
       this.emitProgress({
         type: 'collection_fields_loaded',

@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   buildDatabaseConnectionOptions,
+  describeDatabaseTarget,
   loadDiscogsImportConfig,
   loadRuntimeConfig,
 } from '../src/lib/config.js';
@@ -150,5 +151,26 @@ test('buildDatabaseConnectionOptions preserves configured remote database settin
       tursoDatabaseUrl: 'libsql://example.turso.io',
       useRemoteDb: true,
     },
+  );
+});
+
+test('describeDatabaseTarget reports local and remote migration targets accurately', () => {
+  assert.equal(
+    describeDatabaseTarget({
+      databasePath: 'var/discogs.sqlite',
+      port: 3000,
+      useRemoteDb: false,
+    }),
+    'local database (var/discogs.sqlite)',
+  );
+
+  assert.equal(
+    describeDatabaseTarget({
+      databasePath: 'var/discogs.sqlite',
+      port: 3000,
+      tursoDatabaseUrl: 'libsql://example.turso.io',
+      useRemoteDb: true,
+    }),
+    'remote database (libsql://example.turso.io)',
   );
 });
