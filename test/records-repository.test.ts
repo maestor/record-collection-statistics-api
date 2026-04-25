@@ -96,6 +96,20 @@ test('RecordsRepository filters records across the supported query facets', asyn
   });
 
   try {
+    await seeded.database.execute(
+      `
+        INSERT INTO release_formats (
+          release_id,
+          position,
+          name,
+          qty,
+          format_text,
+          descriptions_json
+        ) VALUES (?, ?, ?, ?, ?, ?)
+      `,
+      [202, 1, 'Vinyl', '1', 'Test Pressing', '["Promo"]'],
+    );
+
     const repository = new RecordsRepository(seeded.database);
     const cases: Array<{
       expectedReleaseIds: number[];
@@ -108,6 +122,14 @@ test('RecordsRepository filters records across the supported query facets', asyn
       {
         query: { q: 'Aurora Audio' },
         expectedReleaseIds: [101],
+      },
+      {
+        query: { q: 'Promo' },
+        expectedReleaseIds: [202],
+      },
+      {
+        query: { q: 'Test Pressing' },
+        expectedReleaseIds: [202],
       },
       {
         query: { label: 'Moon Records' },

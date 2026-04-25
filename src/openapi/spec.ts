@@ -605,7 +605,13 @@ export function buildOpenApiDocument() {
             'List cached releases with filters, sorting, and pagination.',
           operationId: 'listRecords',
           parameters: [
-            { in: 'query', name: 'q', schema: { type: 'string' } },
+            {
+              in: 'query',
+              name: 'q',
+              description:
+                'Case-insensitive free-text match against title, artist, label, format descriptions, and format free text.',
+              schema: { type: 'string' },
+            },
             { in: 'query', name: 'artist', schema: { type: 'string' } },
             { in: 'query', name: 'label', schema: { type: 'string' } },
             { in: 'query', name: 'genre', schema: { type: 'string' } },
