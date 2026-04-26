@@ -21,11 +21,10 @@ Local-first backend for importing a Discogs collection into SQLite and serving a
 - Node.js 24+
 - TypeScript
 - Hono HTTP app
-- libSQL client with local SQLite files today and Turso later
+- libSQL client with local SQLite files and optional Turso reads
 
 ## Commands
 - `npm run db:migrate` applies SQL migrations to the active database target
-- `npm run db:copy-to-remote -- --force` copies the current local SQLite data into Turso as a one-time bootstrap
 - `npm run import:discogs` syncs the Discogs collection and refreshes stale release details
 - The importer prints the target database and progress to `stderr`, and keeps the final JSON summary on `stdout`
 - `npm run dev` starts the local read-only API
@@ -56,7 +55,6 @@ For non-local API access, set:
 - `API_READ_KEY`
 
 Localhost requests bypass API-key checks. Non-local requests must send either `x-api-key` or `Authorization: Bearer <key>`.
-The dedicated `db:copy-to-remote` command always copies from the local SQLite file to Turso and does not require `USE_REMOTE_DB=true`.
 
 ## API Overview
 - `GET /health`
@@ -82,7 +80,7 @@ The OpenAPI document is exposed at `GET /openapi.json` for consumers that want t
 ## Quality
 - Tests focus on importer and API behavior rather than duplicating the same logic in isolated unit tests.
 - Mutation testing is now wired through Stryker as a deeper quality signal, and it is intentionally kept out of the default `verify` path so routine local checks stay fast.
-- The initial mutation scope targets `src/http/validation.ts`, `src/importer/mappers.ts`, and `src/db/copy.ts`.
+- The initial mutation scope targets `src/http/validation.ts` and `src/importer/mappers.ts`.
 
 ## Future Direction
 - Keep repository and SQL boundaries small enough to support local SQLite and remote Turso through the same repository API.
