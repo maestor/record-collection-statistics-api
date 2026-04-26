@@ -1,54 +1,29 @@
 import { Hono } from 'hono';
-import type { AppOptions } from './http/app.js';
-import type { RuntimeConfig } from './lib/config.js';
-import type {
-  DatabaseClient,
-  DatabaseConnectionOptions,
-} from './lib/database.js';
+import { runMigrations } from './db/migrate.js';
+import { createApp } from './http/app.js';
+import {
+  buildDatabaseConnectionOptions,
+  loadRuntimeConfig,
+} from './lib/config.js';
+import { openDatabase } from './lib/database.js';
+import type { RuntimeApp, RuntimeDependencies } from './runtime-types.js';
 
-// Type-only dependency injection surface; Node coverage can report erased
-// members as uncovered in the TypeScript source map.
-/* node:coverage disable */ type RuntimeApp = Pick<Hono, 'fetch'>;
-
-export interface RuntimeDependencies {
-  buildDatabaseConnectionOptions: (
-    config: RuntimeConfig,
-  ) => DatabaseConnectionOptions;
-  createApp: (database: DatabaseClient, options?: AppOptions) => RuntimeApp;
-  loadRuntimeConfig: () => RuntimeConfig;
-  openDatabase: (options: DatabaseConnectionOptions) => DatabaseClient;
-  runMigrations: (database: DatabaseClient) => Promise<void>;
-}
-/* node:coverage enable */
+export type { RuntimeApp, RuntimeDependencies } from './runtime-types.js';
 
 let appPromise: Promise<RuntimeApp> | undefined;
 
-async function loadRuntimeDependencies(): Promise<RuntimeDependencies> {
-  const [
-    { runMigrations },
-    { createApp },
-    { buildDatabaseConnectionOptions, loadRuntimeConfig },
-    { openDatabase },
-  ] = await Promise.all([
-    import('./db/migrate.js'),
-    import('./http/app.js'),
-    import('./lib/config.js'),
-    import('./lib/database.js'),
-  ]);
-
-  return {
-    buildDatabaseConnectionOptions,
-    createApp,
-    loadRuntimeConfig,
-    openDatabase,
-    runMigrations,
-  };
-}
+const defaultRuntimeDependencies: RuntimeDependencies = {
+  buildDatabaseConnectionOptions,
+  createApp,
+  loadRuntimeConfig,
+  openDatabase,
+  runMigrations,
+};
 
 export async function createRuntimeApp(
   dependencies?: RuntimeDependencies,
 ): Promise<RuntimeApp> {
-  const runtimeDependencies = dependencies ?? (await loadRuntimeDependencies());
+  const runtimeDependencies = dependencies ?? defaultRuntimeDependencies;
   const config = runtimeDependencies.loadRuntimeConfig();
   const database = runtimeDependencies.openDatabase(
     runtimeDependencies.buildDatabaseConnectionOptions(config),
