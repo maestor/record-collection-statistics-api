@@ -590,7 +590,11 @@ export class RecordsRepository {
       SELECT
         (SELECT COUNT(*) FROM collection_items) AS total_items,
         (SELECT COUNT(DISTINCT release_id) FROM collection_items) AS total_releases,
-        (SELECT COUNT(DISTINCT name) FROM release_artists) AS total_unique_artists,
+        (
+          SELECT COUNT(DISTINCT name)
+          FROM release_artists
+          WHERE name <> '' AND LOWER(name) <> 'various'
+        ) AS total_unique_artists,
         (SELECT COUNT(DISTINCT name) FROM release_labels) AS total_labels,
         (SELECT COUNT(DISTINCT genre) FROM release_genres) AS total_genres,
         (SELECT COUNT(DISTINCT style) FROM release_styles) AS total_styles,
@@ -818,14 +822,18 @@ export class RecordsRepository {
         (
           SELECT MIN(release_year)
           FROM releases r
-          WHERE EXISTS (
+          WHERE r.release_year IS NOT NULL
+            AND r.release_year <> 0
+            AND EXISTS (
             SELECT 1 FROM collection_items ci WHERE ci.release_id = r.release_id
           )
         ) AS min_release_year,
         (
           SELECT MAX(release_year)
           FROM releases r
-          WHERE EXISTS (
+          WHERE r.release_year IS NOT NULL
+            AND r.release_year <> 0
+            AND EXISTS (
             SELECT 1 FROM collection_items ci WHERE ci.release_id = r.release_id
           )
         ) AS max_release_year
@@ -1011,7 +1019,7 @@ const breakdownQueries: Record<BreakdownDimension, string> = {
       SELECT DISTINCT ci.instance_id, ci.release_id, ra.name AS value
       FROM collection_items ci
       JOIN release_artists ra ON ra.release_id = ci.release_id
-      WHERE ra.name <> ''
+      WHERE ra.name <> '' AND LOWER(ra.name) <> 'various'
     )
     GROUP BY value
     ORDER BY item_count DESC, value ASC
@@ -1077,7 +1085,7 @@ const breakdownQueries: Record<BreakdownDimension, string> = {
       SELECT DISTINCT ci.instance_id, ci.release_id, CAST(r.release_year AS TEXT) AS value
       FROM collection_items ci
       JOIN releases r ON r.release_id = ci.release_id
-      WHERE r.release_year IS NOT NULL
+      WHERE r.release_year IS NOT NULL AND r.release_year <> 0
     )
     GROUP BY value
     ORDER BY value ASC

@@ -6,7 +6,7 @@ import { buildRecordsRouteKey, createApp } from '../src/http/app.js';
 import { parseRecordsQuery } from '../src/http/validation.js';
 import indexHandler from '../src/index.js';
 import { createOpaqueEtag } from '../src/lib/http-cache.js';
-import { seedFixtureImport } from './helpers.js';
+import { createTempDatabase, seedFixtureImport } from './helpers.js';
 
 async function assertCacheRevalidation(
   app: ReturnType<typeof createApp>,
@@ -24,6 +24,79 @@ async function assertCacheRevalidation(
     },
   });
   assert.equal(revalidatedResponse.status, 304);
+}
+
+async function insertCollectedRelease(
+  database: Awaited<ReturnType<typeof createTempDatabase>>['database'],
+  input: {
+    artistName: string;
+    country: string;
+    dateAdded: string;
+    instanceId: number;
+    labelName: string;
+    releaseId: number;
+    releaseYear: number;
+    title: string;
+  },
+): Promise<void> {
+  await database.execute(
+    `
+      INSERT INTO releases (
+        release_id,
+        title,
+        artists_sort,
+        release_year,
+        country,
+        raw_json,
+        fetched_at,
+        stale_after
+      ) VALUES (?, ?, ?, ?, ?, '{}', ?, ?)
+    `,
+    [
+      input.releaseId,
+      input.title,
+      input.artistName,
+      input.releaseYear,
+      input.country,
+      input.dateAdded,
+      input.dateAdded,
+    ],
+  );
+  await database.execute(
+    `
+      INSERT INTO collection_items (
+        instance_id,
+        release_id,
+        folder_id,
+        rating,
+        date_added,
+        raw_json,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, 0, 0, ?, '{}', ?, ?)
+    `,
+    [
+      input.instanceId,
+      input.releaseId,
+      input.dateAdded,
+      input.dateAdded,
+      input.dateAdded,
+    ],
+  );
+  await database.execute(
+    `
+      INSERT INTO release_artists (release_id, position, name)
+      VALUES (?, 0, ?)
+    `,
+    [input.releaseId, input.artistName],
+  );
+  await database.execute(
+    `
+      INSERT INTO release_labels (release_id, position, name)
+      VALUES (?, 0, ?)
+    `,
+    [input.releaseId, input.labelName],
+  );
 }
 
 test('Vercel entrypoints default-export Hono apps', () => {
@@ -811,6 +884,168 @@ test('GET /filters can narrow populated dimensions while preserving response sha
     });
   } finally {
     seeded.cleanup();
+  }
+});
+
+test('stats and filters exclude placeholder artist and unknown release year values while records still expose them', async () => {
+  const { database, cleanup } = await createTempDatabase();
+
+  try {
+    await insertCollectedRelease(database, {
+      releaseId: 101,
+      instanceId: 1001,
+      title: 'Placeholder Compilation',
+      artistName: 'Various',
+      labelName: 'Archive Label',
+      country: 'Finland',
+      releaseYear: 0,
+      dateAdded: '2024-01-01T00:00:00.000Z',
+    });
+    await insertCollectedRelease(database, {
+      releaseId: 202,
+      instanceId: 2001,
+      title: 'Known Artist Album',
+      artistName: 'Alpha Artist',
+      labelName: 'Aurora Audio',
+      country: 'Sweden',
+      releaseYear: 1999,
+      dateAdded: '2024-01-02T00:00:00.000Z',
+    });
+
+    const app = createApp(database);
+
+    const summaryResponse = await app.request('/stats/summary');
+    assert.equal(summaryResponse.status, 200);
+    assert.deepEqual(await summaryResponse.json(), {
+      data: {
+        totals: {
+          collectionItems: 2,
+          releases: 2,
+          uniqueArtists: 1,
+          labels: 2,
+          genres: 0,
+          styles: 0,
+        },
+        addedRange: {
+          first: '2024-01-01T00:00:00.000Z',
+          last: '2024-01-02T00:00:00.000Z',
+        },
+        collectionValue: {
+          minimum: null,
+          median: null,
+          maximum: null,
+        },
+      },
+    });
+
+    const artistBreakdownResponse = await app.request(
+      '/stats/breakdowns/artist',
+    );
+    assert.equal(artistBreakdownResponse.status, 200);
+    assert.deepEqual(await artistBreakdownResponse.json(), {
+      data: [{ value: 'Alpha Artist', itemCount: 1, releaseCount: 1 }],
+      meta: { dimension: 'artist' },
+    });
+
+    const releaseYearBreakdownResponse = await app.request(
+      '/stats/breakdowns/release_year',
+    );
+    assert.equal(releaseYearBreakdownResponse.status, 200);
+    assert.deepEqual(await releaseYearBreakdownResponse.json(), {
+      data: [{ value: '1999', itemCount: 1, releaseCount: 1 }],
+      meta: { dimension: 'release_year' },
+    });
+
+    const filtersResponse = await app.request('/filters?limit=10');
+    assert.equal(filtersResponse.status, 200);
+    assert.deepEqual(await filtersResponse.json(), {
+      data: {
+        artists: [{ value: 'Alpha Artist', itemCount: 1, releaseCount: 1 }],
+        labels: [
+          { value: 'Archive Label', itemCount: 1, releaseCount: 1 },
+          { value: 'Aurora Audio', itemCount: 1, releaseCount: 1 },
+        ],
+        formats: [],
+        genres: [],
+        styles: [],
+        countries: [
+          { value: 'Finland', itemCount: 1, releaseCount: 1 },
+          { value: 'Sweden', itemCount: 1, releaseCount: 1 },
+        ],
+        releaseYears: [{ value: '1999', itemCount: 1, releaseCount: 1 }],
+        addedYears: [{ value: '2024', itemCount: 2, releaseCount: 2 }],
+        ranges: {
+          added: {
+            first: '2024-01-01T00:00:00.000Z',
+            last: '2024-01-02T00:00:00.000Z',
+          },
+          releaseYears: {
+            min: 1999,
+            max: 1999,
+          },
+        },
+      },
+      meta: { limit: 10 },
+    });
+
+    const recordsResponse = await app.request('/records?artist=Various');
+    assert.equal(recordsResponse.status, 200);
+    const recordsPayload = (await recordsResponse.json()) as {
+      data: Array<{
+        artistsSort: string | null;
+        country: string | null;
+        dateAdded: string | null;
+        formats: unknown[];
+        instanceCount: number;
+        releaseId: number;
+        releaseYear: number | null;
+        thumb: string | null;
+        title: string;
+      }>;
+      filters: Record<string, unknown>;
+      meta: {
+        page: number;
+        pageSize: number;
+        total: number;
+        totalPages: number;
+      };
+    };
+    assert.deepEqual(recordsPayload.data, [
+      {
+        releaseId: 101,
+        title: 'Placeholder Compilation',
+        artistsSort: 'Various',
+        releaseYear: 0,
+        country: 'Finland',
+        thumb: null,
+        instanceCount: 1,
+        dateAdded: '2024-01-01T00:00:00.000Z',
+        formats: [],
+      },
+    ]);
+    assert.deepEqual(recordsPayload.meta, {
+      page: 1,
+      pageSize: 25,
+      total: 1,
+      totalPages: 1,
+    });
+    assert.deepEqual(recordsPayload.filters, {
+      q: null,
+      artist: 'Various',
+      label: null,
+      genre: null,
+      style: null,
+      format: null,
+      country: null,
+      yearFrom: null,
+      yearTo: null,
+      addedFrom: null,
+      addedTo: null,
+      sort: 'date_added',
+      order: 'desc',
+    });
+  } finally {
+    cleanup();
   }
 });
 

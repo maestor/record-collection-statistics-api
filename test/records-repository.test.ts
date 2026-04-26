@@ -749,6 +749,105 @@ test('RecordsRepository limits added-year filter catalog values', async () => {
   }
 });
 
+test('RecordsRepository excludes placeholder artists and unknown release years from stats and filters only', async () => {
+  const { database, cleanup } = await createTempDatabase();
+
+  try {
+    await insertCollectedRelease(database, {
+      releaseId: 101,
+      instanceId: 1001,
+      title: 'Placeholder Compilation',
+      artistName: 'Various',
+      labelName: 'Archive Label',
+      country: 'Finland',
+      releaseYear: 0,
+      dateAdded: '2024-01-01T00:00:00.000Z',
+    });
+    await insertCollectedRelease(database, {
+      releaseId: 202,
+      instanceId: 2001,
+      title: 'Known Artist Album',
+      artistName: 'Alpha Artist',
+      labelName: 'Aurora Audio',
+      country: 'Sweden',
+      releaseYear: 1999,
+      dateAdded: '2024-01-02T00:00:00.000Z',
+    });
+
+    const repository = new RecordsRepository(database);
+
+    assert.deepEqual(await repository.getStatsSummary(), {
+      totals: {
+        collectionItems: 2,
+        releases: 2,
+        uniqueArtists: 1,
+        labels: 2,
+        genres: 0,
+        styles: 0,
+      },
+      addedRange: {
+        first: '2024-01-01T00:00:00.000Z',
+        last: '2024-01-02T00:00:00.000Z',
+      },
+      collectionValue: {
+        minimum: null,
+        median: null,
+        maximum: null,
+      },
+    });
+    assert.deepEqual(await repository.getBreakdown('artist'), [
+      { value: 'Alpha Artist', itemCount: 1, releaseCount: 1 },
+    ]);
+    assert.deepEqual(await repository.getBreakdown('release_year'), [
+      { value: '1999', itemCount: 1, releaseCount: 1 },
+    ]);
+    assert.deepEqual(await repository.getFilterCatalog(10), {
+      artists: [{ value: 'Alpha Artist', itemCount: 1, releaseCount: 1 }],
+      labels: [
+        { value: 'Archive Label', itemCount: 1, releaseCount: 1 },
+        { value: 'Aurora Audio', itemCount: 1, releaseCount: 1 },
+      ],
+      formats: [],
+      genres: [],
+      styles: [],
+      countries: [
+        { value: 'Finland', itemCount: 1, releaseCount: 1 },
+        { value: 'Sweden', itemCount: 1, releaseCount: 1 },
+      ],
+      releaseYears: [{ value: '1999', itemCount: 1, releaseCount: 1 }],
+      addedYears: [{ value: '2024', itemCount: 2, releaseCount: 2 }],
+      ranges: {
+        added: {
+          first: '2024-01-01T00:00:00.000Z',
+          last: '2024-01-02T00:00:00.000Z',
+        },
+        releaseYears: {
+          min: 1999,
+          max: 1999,
+        },
+      },
+    });
+    assert.deepEqual(
+      await repository.listRecords(recordsQuery({ artist: 'Various' })),
+      [
+        {
+          releaseId: 101,
+          title: 'Placeholder Compilation',
+          artistsSort: 'Various',
+          releaseYear: 0,
+          country: 'Finland',
+          thumb: null,
+          instanceCount: 1,
+          dateAdded: '2024-01-01T00:00:00.000Z',
+          formats: [],
+        },
+      ],
+    );
+  } finally {
+    cleanup();
+  }
+});
+
 test('RecordsRepository can omit unrequested filter dimensions while keeping ranges', async () => {
   const seeded = await seedFixtureImport({
     now: () => new Date('2026-04-23T10:00:00.000Z'),
