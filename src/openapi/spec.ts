@@ -786,7 +786,8 @@ export function buildOpenApiDocument() {
       '/stats/summary': {
         get: {
           tags: ['Stats'],
-          summary: 'Get collection-wide summary statistics.',
+          summary:
+            'Get collection-wide summary statistics, excluding placeholder artists from unique-artist totals.',
           operationId: 'getStatsSummary',
           responses: {
             '200': {
@@ -812,7 +813,7 @@ export function buildOpenApiDocument() {
         get: {
           tags: ['Stats'],
           summary:
-            'Get a compact dashboard stats payload for dashboards and clients.',
+            'Get a compact dashboard stats payload for dashboards and clients, excluding placeholder artist and unknown release-year breakdown values.',
           operationId: 'getStatsDashboard',
           parameters: [
             {
@@ -859,7 +860,8 @@ export function buildOpenApiDocument() {
       '/filters': {
         get: {
           tags: ['Discovery'],
-          summary: 'Get filter and facet values for records browsing.',
+          summary:
+            'Get filter and facet values for records browsing, excluding placeholder artist and unknown release-year breakdown values.',
           operationId: 'getFilters',
           parameters: [
             {
@@ -926,7 +928,8 @@ export function buildOpenApiDocument() {
       '/stats/breakdowns/{dimension}': {
         get: {
           tags: ['Stats'],
-          summary: 'Get a breakdown for a supported collection dimension.',
+          summary:
+            'Get a breakdown for a supported collection dimension, excluding placeholder artist and unknown release-year values where applicable.',
           operationId: 'getStatsBreakdown',
           parameters: [
             {
