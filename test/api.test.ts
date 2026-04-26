@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import appHandler from '../src/app.js';
-import { createApp } from '../src/http/app.js';
+import { buildRecordsRouteKey, createApp } from '../src/http/app.js';
+import { parseRecordsQuery } from '../src/http/validation.js';
 import indexHandler from '../src/index.js';
+import { createOpaqueEtag } from '../src/lib/http-cache.js';
 import { seedFixtureImport } from './helpers.js';
 
 async function assertCacheRevalidation(
@@ -29,10 +31,48 @@ test('Vercel entrypoints default-export Hono apps', () => {
   assert.equal(indexHandler, appHandler);
 });
 
+test('buildRecordsRouteKey encodes the full canonical records query shape', () => {
+  assert.equal(
+    buildRecordsRouteKey(
+      parseRecordsQuery({
+        q: 'Northern',
+        artist: 'Alpha Artist',
+        label: 'Aurora Audio',
+        genre: 'Rock',
+        style: 'Indie Rock',
+        format: 'CD',
+        country: 'Finland',
+        year_from: '1999',
+        year_to: '2005',
+        added_from: '2024-01-01',
+        added_to: '2024-03-10',
+        page: '2',
+        page_size: '10',
+        sort: 'title',
+        order: 'asc',
+      }),
+    ),
+    '/records?q=Northern&artist=Alpha+Artist&label=Aurora+Audio&genre=Rock&style=Indie+Rock&format=CD&country=Finland&year_from=1999&year_to=2005&added_from=2024-01-01T00%3A00%3A00.000Z&added_to=2024-03-10T23%3A59%3A59.999Z&page=2&page_size=10&sort=title&order=asc',
+  );
+
+  assert.equal(
+    buildRecordsRouteKey(
+      parseRecordsQuery({
+        page: '1',
+        page_size: '25',
+        sort: 'date_added',
+        order: 'desc',
+      }),
+    ),
+    '/records?page=1&page_size=25&sort=date_added&order=desc',
+  );
+});
+
 test('GET /records returns paginated release data and stable cache metadata', async () => {
   const seeded = await seedFixtureImport({
     now: () => new Date('2026-04-23T10:00:00.000Z'),
   });
+  const collectionVersion = '2026-04-23T10:00:00.000Z';
 
   try {
     const app = createApp(seeded.database);
@@ -42,7 +82,13 @@ test('GET /records returns paginated release data and stable cache metadata', as
 
     assert.equal(response.status, 200);
     assert.match(response.headers.get('cache-control') ?? '', /max-age=60/);
-    assert.ok(response.headers.get('etag'));
+    assert.equal(
+      response.headers.get('etag'),
+      createOpaqueEtag(
+        collectionVersion,
+        '/records?page=1&page_size=1&sort=title&order=asc',
+      ),
+    );
 
     const payload = (await response.json()) as {
       data: Array<{
@@ -489,12 +535,17 @@ test('stats endpoints return collection summary and breakdowns', async () => {
   const seeded = await seedFixtureImport({
     now: () => new Date('2026-04-23T10:00:00.000Z'),
   });
+  const collectionVersion = '2026-04-23T10:00:00.000Z';
 
   try {
     const app = createApp(seeded.database);
 
     const summaryResponse = await app.request('/stats/summary');
     assert.equal(summaryResponse.status, 200);
+    assert.equal(
+      summaryResponse.headers.get('etag'),
+      createOpaqueEtag(collectionVersion, '/stats/summary'),
+    );
     const summaryPayload = (await summaryResponse.json()) as {
       data: {
         addedRange: {
@@ -538,6 +589,10 @@ test('stats endpoints return collection summary and breakdowns', async () => {
 
     const breakdownResponse = await app.request('/stats/breakdowns/artist');
     assert.equal(breakdownResponse.status, 200);
+    assert.equal(
+      breakdownResponse.headers.get('etag'),
+      createOpaqueEtag(collectionVersion, '/stats/breakdowns/artist'),
+    );
     const breakdownPayload = (await breakdownResponse.json()) as {
       data: Array<{ itemCount: number; releaseCount: number; value: string }>;
       meta: { dimension: string };
@@ -560,11 +615,16 @@ test('GET /stats/dashboard returns summary plus top breakdowns', async () => {
   const seeded = await seedFixtureImport({
     now: () => new Date('2026-04-23T10:00:00.000Z'),
   });
+  const collectionVersion = '2026-04-23T10:00:00.000Z';
 
   try {
     const app = createApp(seeded.database);
     const response = await app.request('/stats/dashboard?limit=1');
     assert.equal(response.status, 200);
+    assert.equal(
+      response.headers.get('etag'),
+      createOpaqueEtag(collectionVersion, '/stats/dashboard?limit=1'),
+    );
 
     const payload = (await response.json()) as {
       data: {
@@ -630,12 +690,17 @@ test('GET /filters returns available filter values and respects limit validation
   const seeded = await seedFixtureImport({
     now: () => new Date('2026-04-23T10:00:00.000Z'),
   });
+  const collectionVersion = '2026-04-23T10:00:00.000Z';
 
   try {
     const app = createApp(seeded.database);
 
     const response = await app.request('/filters?limit=1');
     assert.equal(response.status, 200);
+    assert.equal(
+      response.headers.get('etag'),
+      createOpaqueEtag(collectionVersion, '/filters?limit=1'),
+    );
 
     const payload = (await response.json()) as {
       data: {
@@ -695,6 +760,7 @@ test('GET /filters can narrow populated dimensions while preserving response sha
   const seeded = await seedFixtureImport({
     now: () => new Date('2026-04-23T10:00:00.000Z'),
   });
+  const collectionVersion = '2026-04-23T10:00:00.000Z';
 
   try {
     const app = createApp(seeded.database);
@@ -702,6 +768,13 @@ test('GET /filters can narrow populated dimensions while preserving response sha
       '/filters?limit=1&dimensions=artist,format,genre',
     );
     assert.equal(response.status, 200);
+    assert.equal(
+      response.headers.get('etag'),
+      createOpaqueEtag(
+        collectionVersion,
+        '/filters?limit=1&dimensions=artist,format,genre',
+      ),
+    );
 
     const payload = (await response.json()) as {
       data: {
@@ -745,11 +818,16 @@ test('GET /health reports a successful local sync snapshot', async () => {
   const seeded = await seedFixtureImport({
     now: () => new Date('2026-04-23T10:00:00.000Z'),
   });
+  const collectionVersion = '2026-04-23T10:00:00.000Z';
 
   try {
     const app = createApp(seeded.database);
     const response = await app.request('/health');
     assert.equal(response.status, 200);
+    assert.equal(
+      response.headers.get('etag'),
+      createOpaqueEtag(collectionVersion, '/health'),
+    );
 
     const payload = (await response.json()) as {
       database: {
@@ -847,6 +925,69 @@ test('collection-version ETags short-circuit expensive filter queries on revalid
 
     assert.equal(revalidatedResponse.status, 304);
     assert.equal(queryAllCalls, 0);
+  } finally {
+    seeded.cleanup();
+  }
+});
+
+test('collection-version ETags vary by canonical route key semantics', async () => {
+  const seeded = await seedFixtureImport({
+    now: () => new Date('2026-04-23T10:00:00.000Z'),
+  });
+
+  try {
+    const app = createApp(seeded.database);
+
+    const healthEtag = (await app.request('/health')).headers.get('etag');
+    const summaryEtag = (await app.request('/stats/summary')).headers.get(
+      'etag',
+    );
+    const recordsTitleEtag = (
+      await app.request('/records?page_size=1&sort=title&order=asc')
+    ).headers.get('etag');
+    const recordsYearEtag = (
+      await app.request('/records?page_size=1&sort=release_year&order=asc')
+    ).headers.get('etag');
+    const filteredRecordsEtag = (
+      await app.request('/records?artist=Alpha%20Artist')
+    ).headers.get('etag');
+    const dashboardOneEtag = (
+      await app.request('/stats/dashboard?limit=1')
+    ).headers.get('etag');
+    const dashboardTwoEtag = (
+      await app.request('/stats/dashboard?limit=2')
+    ).headers.get('etag');
+    const filterCanonicalEtag = (
+      await app.request('/filters?limit=1&dimensions=artist,format,genre')
+    ).headers.get('etag');
+    const filterReorderedEtag = (
+      await app.request('/filters?dimensions=genre,artist,format&limit=1')
+    ).headers.get('etag');
+    const filterLabelEtag = (
+      await app.request('/filters?limit=1&dimensions=label')
+    ).headers.get('etag');
+    const detail101Etag = (await app.request('/records/101')).headers.get(
+      'etag',
+    );
+    const detail202Etag = (await app.request('/records/202')).headers.get(
+      'etag',
+    );
+    const artistBreakdownEtag = (
+      await app.request('/stats/breakdowns/artist')
+    ).headers.get('etag');
+    const labelBreakdownEtag = (
+      await app.request('/stats/breakdowns/label')
+    ).headers.get('etag');
+
+    assert.ok(healthEtag);
+    assert.notEqual(healthEtag, summaryEtag);
+    assert.notEqual(recordsTitleEtag, recordsYearEtag);
+    assert.notEqual(recordsTitleEtag, filteredRecordsEtag);
+    assert.notEqual(dashboardOneEtag, dashboardTwoEtag);
+    assert.equal(filterCanonicalEtag, filterReorderedEtag);
+    assert.notEqual(filterCanonicalEtag, filterLabelEtag);
+    assert.notEqual(detail101Etag, detail202Etag);
+    assert.notEqual(artistBreakdownEtag, labelBreakdownEtag);
   } finally {
     seeded.cleanup();
   }
