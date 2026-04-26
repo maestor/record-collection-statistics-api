@@ -132,7 +132,11 @@ export class ImportRepository {
           [item.instanceId],
         );
 
-        for (const value of fieldValuesByInstance.get(item.instanceId) ?? []) {
+        const fieldValues = fieldValuesByInstance.get(
+          item.instanceId,
+        ) as NormalizedCollectionFieldValue[];
+
+        for (const value of fieldValues) {
           await transaction.execute(
             `
               INSERT INTO collection_item_field_values (
