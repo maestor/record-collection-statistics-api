@@ -1,14 +1,22 @@
 import { type Context, Hono } from 'hono';
 import type { DatabaseClient } from '../lib/database.js';
-import { createJsonCacheResponse } from '../lib/http-cache.js';
+import {
+  createJsonCacheResponse,
+  createNotModifiedResponse,
+  createOpaqueEtag,
+} from '../lib/http-cache.js';
 import { buildOpenApiDocument } from '../openapi/spec.js';
 import { RecordsRepository } from '../repositories/records-repository.js';
 import {
+  allowedBreakdownDimensions,
+  type BreakdownDimension,
   parseBreakdownDimension,
+  parseBreakdownDimensions,
   parseFacetLimit,
   parseRecordsQuery,
   parseReleaseId,
   validateAllowedQueryKeys,
+  validateFilterCatalogQueryKeys,
   validateLimitOnlyQueryKeys,
   validateRecordsQueryKeys,
 } from './validation.js';
@@ -49,6 +57,57 @@ function cacheOptions(context: Context): { ifNoneMatch: string | null } {
   return {
     ifNoneMatch: context.req.header('if-none-match') ?? null,
   };
+}
+
+function buildCanonicalRouteKey(
+  path: string,
+  params: Record<string, number | string | undefined>,
+): string {
+  const searchParams = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params).sort(([left], [right]) =>
+    left.localeCompare(right),
+  )) {
+    if (value === undefined) {
+      continue;
+    }
+
+    searchParams.set(key, String(value));
+  }
+
+  const query = searchParams.toString();
+  return query ? `${path}?${query}` : path;
+}
+
+function createCollectionEtag(version: string, routeKey: string): string {
+  return createOpaqueEtag('collection', version, routeKey);
+}
+
+async function respondIfCollectionUnchanged(
+  context: Context,
+  recordsRepository: RecordsRepository,
+  routeKey: string,
+): Promise<string | Response> {
+  const collectionVersion = await recordsRepository.getCollectionVersion();
+  const etag = createCollectionEtag(collectionVersion, routeKey);
+
+  if (cacheOptions(context).ifNoneMatch === etag) {
+    return createNotModifiedResponse(etag);
+  }
+
+  return etag;
+}
+
+function normalizeFilterDimensions(
+  dimensions: BreakdownDimension[] | undefined,
+): string | undefined {
+  if (!dimensions) {
+    return undefined;
+  }
+
+  return allowedBreakdownDimensions
+    .filter((dimension) => dimensions.includes(dimension))
+    .join(',');
 }
 
 export function createApp(
@@ -178,6 +237,15 @@ export function createApp(
 
   app.get('/health', async (context) => {
     validateAllowedQueryKeys(context.req.query(), new Set(), '/health');
+    const routeKey = buildCanonicalRouteKey('/health', {});
+    const etagOrResponse = await respondIfCollectionUnchanged(
+      context,
+      recordsRepository,
+      routeKey,
+    );
+    if (etagOrResponse instanceof Response) {
+      return etagOrResponse;
+    }
 
     const snapshot = await recordsRepository.getHealthSnapshot();
     return createJsonCacheResponse(
@@ -189,7 +257,10 @@ export function createApp(
           lastSuccessfulSyncAt: snapshot.lastSuccessfulSyncAt,
         },
       },
-      cacheOptions(context),
+      {
+        ...cacheOptions(context),
+        etag: etagOrResponse,
+      },
     );
   });
 
@@ -197,6 +268,31 @@ export function createApp(
     const rawQuery = context.req.query();
     validateRecordsQueryKeys(rawQuery);
     const query = parseRecordsQuery(rawQuery);
+    const routeKey = buildCanonicalRouteKey('/records', {
+      q: query.q,
+      artist: query.artist,
+      label: query.label,
+      genre: query.genre,
+      style: query.style,
+      format: query.format,
+      country: query.country,
+      year_from: query.yearFrom,
+      year_to: query.yearTo,
+      added_from: query.addedFrom,
+      added_to: query.addedTo,
+      page: query.page,
+      page_size: query.pageSize,
+      sort: query.sort,
+      order: query.order,
+    });
+    const etagOrResponse = await respondIfCollectionUnchanged(
+      context,
+      recordsRepository,
+      routeKey,
+    );
+    if (etagOrResponse instanceof Response) {
+      return etagOrResponse;
+    }
     const total = await recordsRepository.countRecords(query);
     const items = await recordsRepository.listRecords(query);
 
@@ -225,7 +321,10 @@ export function createApp(
           order: query.order,
         },
       },
-      cacheOptions(context),
+      {
+        ...cacheOptions(context),
+        etag: etagOrResponse,
+      },
     );
   });
 
@@ -237,6 +336,15 @@ export function createApp(
     );
 
     const releaseId = parseReleaseId(context.req.param('releaseId'));
+    const routeKey = `/records/${releaseId}`;
+    const etagOrResponse = await respondIfCollectionUnchanged(
+      context,
+      recordsRepository,
+      routeKey,
+    );
+    if (etagOrResponse instanceof Response) {
+      return etagOrResponse;
+    }
     const record = await recordsRepository.getRecordDetail(releaseId);
     if (!record) {
       return context.json(
@@ -251,18 +359,33 @@ export function createApp(
       {
         data: record,
       },
-      cacheOptions(context),
+      {
+        ...cacheOptions(context),
+        etag: etagOrResponse,
+      },
     );
   });
 
   app.get('/stats/summary', async (context) => {
     validateAllowedQueryKeys(context.req.query(), new Set(), '/stats/summary');
+    const routeKey = buildCanonicalRouteKey('/stats/summary', {});
+    const etagOrResponse = await respondIfCollectionUnchanged(
+      context,
+      recordsRepository,
+      routeKey,
+    );
+    if (etagOrResponse instanceof Response) {
+      return etagOrResponse;
+    }
 
     return createJsonCacheResponse(
       {
         data: await recordsRepository.getStatsSummary(),
       },
-      cacheOptions(context),
+      {
+        ...cacheOptions(context),
+        etag: etagOrResponse,
+      },
     );
   });
 
@@ -270,6 +393,15 @@ export function createApp(
     const rawQuery = context.req.query();
     validateLimitOnlyQueryKeys(rawQuery, '/stats/dashboard');
     const limit = parseFacetLimit(rawQuery.limit);
+    const routeKey = buildCanonicalRouteKey('/stats/dashboard', { limit });
+    const etagOrResponse = await respondIfCollectionUnchanged(
+      context,
+      recordsRepository,
+      routeKey,
+    );
+    if (etagOrResponse instanceof Response) {
+      return etagOrResponse;
+    }
 
     return createJsonCacheResponse(
       {
@@ -278,23 +410,45 @@ export function createApp(
           limit,
         },
       },
-      cacheOptions(context),
+      {
+        ...cacheOptions(context),
+        etag: etagOrResponse,
+      },
     );
   });
 
   app.get('/filters', async (context) => {
     const rawQuery = context.req.query();
-    validateLimitOnlyQueryKeys(rawQuery, '/filters');
+    validateFilterCatalogQueryKeys(rawQuery);
     const limit = parseFacetLimit(rawQuery.limit);
+    const dimensions = parseBreakdownDimensions(rawQuery.dimensions);
+    const routeKey = buildCanonicalRouteKey('/filters', {
+      limit,
+      dimensions: normalizeFilterDimensions(dimensions),
+    });
+    const etagOrResponse = await respondIfCollectionUnchanged(
+      context,
+      recordsRepository,
+      routeKey,
+    );
+    if (etagOrResponse instanceof Response) {
+      return etagOrResponse;
+    }
 
     return createJsonCacheResponse(
       {
-        data: await recordsRepository.getFilterCatalog(limit),
+        data: dimensions
+          ? await recordsRepository.getFilterCatalog(limit, { dimensions })
+          : await recordsRepository.getFilterCatalog(limit),
         meta: {
           limit,
+          ...(dimensions ? { dimensions } : {}),
         },
       },
-      cacheOptions(context),
+      {
+        ...cacheOptions(context),
+        etag: etagOrResponse,
+      },
     );
   });
 
@@ -306,6 +460,18 @@ export function createApp(
     );
 
     const dimension = parseBreakdownDimension(context.req.param('dimension'));
+    const routeKey = buildCanonicalRouteKey(
+      `/stats/breakdowns/${dimension}`,
+      {},
+    );
+    const etagOrResponse = await respondIfCollectionUnchanged(
+      context,
+      recordsRepository,
+      routeKey,
+    );
+    if (etagOrResponse instanceof Response) {
+      return etagOrResponse;
+    }
     return createJsonCacheResponse(
       {
         data: await recordsRepository.getBreakdown(dimension),
@@ -313,7 +479,10 @@ export function createApp(
           dimension,
         },
       },
-      cacheOptions(context),
+      {
+        ...cacheOptions(context),
+        etag: etagOrResponse,
+      },
     );
   });
 

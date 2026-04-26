@@ -872,6 +872,21 @@ export function buildOpenApiDocument() {
                 maximum: 250,
               },
             },
+            {
+              in: 'query',
+              name: 'dimensions',
+              description:
+                'Optional comma-separated subset of breakdown dimensions to populate. Omitted dimensions return empty arrays so the response shape stays stable.',
+              style: 'form',
+              explode: false,
+              schema: {
+                type: 'array',
+                items: {
+                  type: 'string',
+                  enum: [...allowedBreakdownDimensions],
+                },
+              },
+            },
           ],
           responses: {
             '200': {
@@ -890,6 +905,13 @@ export function buildOpenApiDocument() {
                         required: ['limit'],
                         properties: {
                           limit: { type: 'integer' },
+                          dimensions: {
+                            type: 'array',
+                            items: {
+                              type: 'string',
+                              enum: [...allowedBreakdownDimensions],
+                            },
+                          },
                         },
                       },
                     },

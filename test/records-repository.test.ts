@@ -648,8 +648,10 @@ test('RecordsRepository composes filter catalog and dashboard limits intentional
   try {
     const repository = new RecordsRepository(seeded.database);
     const catalog = await repository.getFilterCatalog(1);
+    const catalogWithEmptyOptions = await repository.getFilterCatalog(1, {});
     const dashboard = await repository.getDashboardStats(1);
 
+    assert.deepEqual(catalogWithEmptyOptions, catalog);
     assert.deepEqual(catalog.ranges, {
       added: {
         first: '2024-01-10T15:00:00.000Z',
@@ -747,6 +749,38 @@ test('RecordsRepository limits added-year filter catalog values', async () => {
   }
 });
 
+test('RecordsRepository can omit unrequested filter dimensions while keeping ranges', async () => {
+  const seeded = await seedFixtureImport({
+    now: () => new Date('2026-04-23T10:00:00.000Z'),
+  });
+
+  try {
+    const repository = new RecordsRepository(seeded.database);
+    const catalog = await repository.getFilterCatalog(1, {
+      dimensions: ['label'],
+    });
+
+    assert.deepEqual(catalog.artists, []);
+    assert.deepEqual(catalog.formats, []);
+    assert.deepEqual(catalog.genres, []);
+    assert.deepEqual(catalog.labels, [
+      { value: 'Aurora Audio', itemCount: 2, releaseCount: 1 },
+    ]);
+    assert.deepEqual(catalog.ranges, {
+      added: {
+        first: '2024-01-10T15:00:00.000Z',
+        last: '2024-03-05T00:00:00.000Z',
+      },
+      releaseYears: {
+        min: 1999,
+        max: 2005,
+      },
+    });
+  } finally {
+    seeded.cleanup();
+  }
+});
+
 test('RecordsRepository returns empty-cache defaults', async () => {
   const { database, cleanup } = await createTempDatabase();
 
@@ -776,6 +810,7 @@ test('RecordsRepository returns empty-cache defaults', async () => {
       },
     });
     assert.deepEqual(await repository.getBreakdown('artist'), []);
+    assert.equal(await repository.getCollectionVersion(), 'empty');
     assert.deepEqual(await repository.getFilterCatalog(1), {
       artists: [],
       labels: [],

@@ -60,6 +60,7 @@ const recordsQueryKeys = new Set([
 ]);
 
 const limitOnlyQueryKeys = new Set(['limit']);
+const filterCatalogQueryKeys = new Set(['limit', 'dimensions']);
 
 export function validateAllowedQueryKeys(
   rawQuery: Record<string, string | undefined>,
@@ -90,6 +91,12 @@ export function validateLimitOnlyQueryKeys(
   endpointName: string,
 ): void {
   validateAllowedQueryKeys(rawQuery, limitOnlyQueryKeys, endpointName);
+}
+
+export function validateFilterCatalogQueryKeys(
+  rawQuery: Record<string, string | undefined>,
+): void {
+  validateAllowedQueryKeys(rawQuery, filterCatalogQueryKeys, '/filters');
 }
 
 export function parseFacetLimit(value: string | undefined): number {
@@ -251,4 +258,40 @@ export function parseBreakdownDimension(value: string): BreakdownDimension {
   throw new Error(
     `dimension must be one of: ${allowedBreakdownDimensions.join(', ')}`,
   );
+}
+
+export function parseBreakdownDimensions(
+  value: string | undefined,
+): BreakdownDimension[] | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const requestedDimensions = value
+    .split(',')
+    .map((candidate) => candidate.trim())
+    .filter(Boolean);
+
+  if (requestedDimensions.length === 0) {
+    throw new Error(
+      `dimensions must include at least one of: ${allowedBreakdownDimensions.join(', ')}`,
+    );
+  }
+
+  if (
+    requestedDimensions.some(
+      (dimension) =>
+        !allowedBreakdownDimensions.includes(dimension as BreakdownDimension),
+    )
+  ) {
+    throw new Error(
+      `dimensions must be a comma-separated list of: ${allowedBreakdownDimensions.join(', ')}`,
+    );
+  }
+
+  const normalizedDimensions = allowedBreakdownDimensions.filter((dimension) =>
+    requestedDimensions.includes(dimension),
+  );
+
+  return normalizedDimensions;
 }
