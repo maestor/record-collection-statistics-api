@@ -2,7 +2,14 @@
   "$schema": "https://biomejs.dev/schemas/2.4.13/schema.json",
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!coverage", "!node_modules", "!reports", "!var"]
+    "includes": [
+      "**",
+      "!coverage",
+      "!node_modules",
+      "!reports",
+      "!.stryker-tmp",
+      "!var"
+    ]
   },
   "formatter": {
     "enabled": true,

@@ -2,17 +2,44 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type {
+  DiscogsCollectionField,
   DiscogsCollectionFieldValue,
   DiscogsCollectionRelease,
   DiscogsReleaseDetail,
 } from '../src/discogs/types.js';
 import {
+  normalizeCollectionField,
   normalizeCollectionFieldValue,
   normalizeCollectionItem,
   normalizeCollectionValue,
   normalizeReleaseDetail,
 } from '../src/importer/mappers.js';
 import { readFixture } from './helpers.js';
+
+test('normalizeCollectionField maps public fields and nullable metadata', () => {
+  const publicField: DiscogsCollectionField = {
+    id: 7,
+    name: 'Public Notes',
+    type: 'textarea',
+    position: 4,
+    public: true,
+  };
+
+  assert.deepEqual(
+    normalizeCollectionField(publicField, '2026-04-23T10:00:00.000Z'),
+    {
+      fieldId: 7,
+      name: 'Public Notes',
+      fieldType: 'textarea',
+      position: 4,
+      isPublic: 1,
+      optionsJson: null,
+      lines: null,
+      rawJson: JSON.stringify(publicField),
+      updatedAt: '2026-04-23T10:00:00.000Z',
+    },
+  );
+});
 
 test('normalizeCollectionFieldValue rejects invalid field ids and preserves valid values', () => {
   const invalidNote = {
@@ -210,4 +237,65 @@ test('normalizeReleaseDetail preserves empty defaults for missing collection arr
   ]);
   assert.deepEqual(normalized.genres, []);
   assert.deepEqual(normalized.styles, []);
+});
+
+test('normalizeReleaseDetail maps sparse nested relation entries', () => {
+  const normalized = normalizeReleaseDetail(
+    {
+      id: 404,
+      title: 'Sparse Relations',
+      artists: [
+        {
+          name: 'Anonymous Artist',
+        },
+      ],
+      labels: [
+        {
+          name: 'White Label',
+        },
+      ],
+      identifiers: [
+        {
+          type: 'Catalog Number',
+          value: 'WL-404',
+        },
+      ],
+    } as DiscogsReleaseDetail,
+    '2026-04-23T10:00:00.000Z',
+    30,
+  );
+
+  assert.deepEqual(normalized.artists, [
+    {
+      position: 0,
+      artistId: null,
+      name: 'Anonymous Artist',
+      anv: null,
+      joinText: null,
+      role: null,
+      tracks: null,
+      resourceUrl: null,
+      thumbnailUrl: null,
+    },
+  ]);
+  assert.deepEqual(normalized.labels, [
+    {
+      position: 0,
+      labelId: null,
+      name: 'White Label',
+      catno: null,
+      entityType: null,
+      entityTypeName: null,
+      resourceUrl: null,
+      thumbnailUrl: null,
+    },
+  ]);
+  assert.deepEqual(normalized.identifiers, [
+    {
+      position: 0,
+      identifierType: 'Catalog Number',
+      value: 'WL-404',
+      description: null,
+    },
+  ]);
 });

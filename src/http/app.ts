@@ -42,7 +42,7 @@ function resolvePresentedApiKey(request: Request): string | null {
   }
 
   const bearerToken = authorization.slice(bearerPrefix.length).trim();
-  return bearerToken || null;
+  return bearerToken;
 }
 
 function cacheOptions(context: Context): { ifNoneMatch: string | null } {

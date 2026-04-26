@@ -292,6 +292,16 @@ test('non-local requests require API key while localhost stays open', async () =
     );
     assert.equal(unsupportedAuthorizationResponse.status, 401);
 
+    const emptyBearerResponse = await app.request(
+      'https://example.com/health',
+      {
+        headers: {
+          authorization: 'Bearer   ',
+        },
+      },
+    );
+    assert.equal(emptyBearerResponse.status, 401);
+
     const xApiKeyResponse = await app.request('https://example.com/health', {
       headers: {
         'x-api-key': 'secret-read-key',

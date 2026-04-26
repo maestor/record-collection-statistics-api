@@ -109,6 +109,34 @@ interface ReleaseYearRange {
   min: number | null;
 }
 
+interface RecordCountRow {
+  total: number;
+}
+
+interface StatsSummaryRow {
+  collection_value_maximum: number | null;
+  collection_value_median: number | null;
+  collection_value_minimum: number | null;
+  first_added_at: string | null;
+  last_added_at: string | null;
+  total_genres: number;
+  total_items: number;
+  total_labels: number;
+  total_releases: number;
+  total_styles: number;
+  total_unique_artists: number;
+}
+
+interface HealthTotalsRow {
+  release_count: number;
+  total_items: number;
+}
+
+interface ReleaseYearRangeRow {
+  max_release_year: number | null;
+  min_release_year: number | null;
+}
+
 export interface FilterCatalog {
   addedYears: BreakdownItem[];
   artists: BreakdownItem[];
@@ -150,16 +178,16 @@ export class RecordsRepository {
 
   async countRecords(query: RecordsQueryInput): Promise<number> {
     const { whereSql, params } = buildRecordFilters(query);
-    const row = await this.database.queryOne<{ total: number }>(
+    const row = (await this.database.queryOne<RecordCountRow>(
       `
         SELECT COUNT(*) AS total
         FROM releases r
         WHERE ${whereSql}
       `,
       params,
-    );
+    )) as RecordCountRow;
 
-    return Number(row?.total ?? 0);
+    return Number(row.total);
   }
 
   async listRecords(query: RecordsQueryInput): Promise<RecordListItem[]> {
@@ -557,19 +585,7 @@ export class RecordsRepository {
   }
 
   async getStatsSummary(): Promise<StatsSummary> {
-    const row = await this.database.queryOne<{
-      collection_value_maximum: number | null;
-      collection_value_median: number | null;
-      collection_value_minimum: number | null;
-      first_added_at: string | null;
-      last_added_at: string | null;
-      total_genres: number;
-      total_items: number;
-      total_labels: number;
-      total_releases: number;
-      total_styles: number;
-      total_unique_artists: number;
-    }>(`
+    const row = (await this.database.queryOne<StatsSummaryRow>(`
       SELECT
         (SELECT COUNT(*) FROM collection_items) AS total_items,
         (SELECT COUNT(DISTINCT release_id) FROM collection_items) AS total_releases,
@@ -600,34 +616,34 @@ export class RecordsRepository {
           ORDER BY id DESC
           LIMIT 1
         ) AS collection_value_maximum
-    `);
+    `)) as StatsSummaryRow;
 
     return {
       totals: {
-        collectionItems: Number(row?.total_items ?? 0),
-        releases: Number(row?.total_releases ?? 0),
-        uniqueArtists: Number(row?.total_unique_artists ?? 0),
-        labels: Number(row?.total_labels ?? 0),
-        genres: Number(row?.total_genres ?? 0),
-        styles: Number(row?.total_styles ?? 0),
+        collectionItems: Number(row.total_items),
+        releases: Number(row.total_releases),
+        uniqueArtists: Number(row.total_unique_artists),
+        labels: Number(row.total_labels),
+        genres: Number(row.total_genres),
+        styles: Number(row.total_styles),
       },
       addedRange: {
-        first: row?.first_added_at ?? null,
-        last: row?.last_added_at ?? null,
+        first: row.first_added_at,
+        last: row.last_added_at,
       },
       collectionValue: {
         minimum:
-          row?.collection_value_minimum === null
+          row.collection_value_minimum === null
             ? null
-            : Number(row?.collection_value_minimum),
+            : Number(row.collection_value_minimum),
         median:
-          row?.collection_value_median === null
+          row.collection_value_median === null
             ? null
-            : Number(row?.collection_value_median),
+            : Number(row.collection_value_median),
         maximum:
-          row?.collection_value_maximum === null
+          row.collection_value_maximum === null
             ? null
-            : Number(row?.collection_value_maximum),
+            : Number(row.collection_value_maximum),
       },
     };
   }
@@ -747,27 +763,21 @@ export class RecordsRepository {
         )
       )?.value ?? null;
 
-    const totals = await this.database.queryOne<{
-      release_count: number;
-      total_items: number;
-    }>(`
+    const totals = (await this.database.queryOne<HealthTotalsRow>(`
       SELECT
         (SELECT COUNT(*) FROM collection_items) AS total_items,
         (SELECT COUNT(DISTINCT release_id) FROM collection_items) AS release_count
-    `);
+    `)) as HealthTotalsRow;
 
     return {
       lastSuccessfulSyncAt,
-      totalItems: Number(totals?.total_items ?? 0),
-      releaseCount: Number(totals?.release_count ?? 0),
+      totalItems: Number(totals.total_items),
+      releaseCount: Number(totals.release_count),
     };
   }
 
   private async getReleaseYearRange(): Promise<ReleaseYearRange> {
-    const row = await this.database.queryOne<{
-      max_release_year: number | null;
-      min_release_year: number | null;
-    }>(`
+    const row = (await this.database.queryOne<ReleaseYearRangeRow>(`
       SELECT
         (
           SELECT MIN(release_year)
@@ -783,13 +793,11 @@ export class RecordsRepository {
             SELECT 1 FROM collection_items ci WHERE ci.release_id = r.release_id
           )
         ) AS max_release_year
-    `);
+    `)) as ReleaseYearRangeRow;
 
     return {
-      min:
-        row?.min_release_year === null ? null : Number(row?.min_release_year),
-      max:
-        row?.max_release_year === null ? null : Number(row?.max_release_year),
+      min: row.min_release_year === null ? null : Number(row.min_release_year),
+      max: row.max_release_year === null ? null : Number(row.max_release_year),
     };
   }
 }
