@@ -68,7 +68,7 @@ function appendRouteKeyParam(
   }
 }
 
-function buildRecordsRouteKey(query: RecordsQueryInput): string {
+export function buildRecordsRouteKey(query: RecordsQueryInput): string {
   const searchParams = new URLSearchParams();
 
   appendRouteKeyParam(searchParams, 'q', query.q);
