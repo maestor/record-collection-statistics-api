@@ -75,6 +75,34 @@ test('loadRuntimeConfig applies defaults and trims optional remote settings', ()
   );
 });
 
+test('loadRuntimeConfig omits blank optional settings while preserving remote mode', () => {
+  withEnv(
+    {
+      API_READ_KEY: '   ',
+      TURSO_AUTH_TOKEN: '   ',
+      TURSO_DATABASE_URL: '   ',
+      USE_REMOTE_DB: 'true',
+    },
+    () => {
+      const config = loadRuntimeConfig();
+
+      assert.deepEqual(config, {
+        databasePath: 'var/discogs.sqlite',
+        port: 3000,
+        useRemoteDb: true,
+      });
+      assert.deepEqual(buildDatabaseConnectionOptions(config), {
+        databasePath: 'var/discogs.sqlite',
+        useRemoteDb: true,
+      });
+      assert.equal(
+        describeDatabaseTarget(config),
+        'remote database (unknown url)',
+      );
+    },
+  );
+});
+
 test('loadRuntimeConfig rejects malformed runtime environment values', () => {
   withEnv(
     {

@@ -11,7 +11,6 @@
   "scripts": {
     "dev": "node --watch --import tsx src/server.ts",
     "db:migrate": "node --import tsx src/cli/db-migrate.ts",
-    "db:copy-to-remote": "node --import tsx src/cli/db-copy-to-remote.ts",
     "import:discogs": "node --import tsx src/cli/import-discogs.ts",
     "test": "node --import tsx --test",
     "test:coverage": "node --import tsx --test --experimental-test-coverage --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=97",
