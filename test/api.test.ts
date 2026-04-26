@@ -691,6 +691,56 @@ test('GET /filters returns available filter values and respects limit validation
   }
 });
 
+test('GET /filters can narrow populated dimensions while preserving response shape', async () => {
+  const seeded = await seedFixtureImport({
+    now: () => new Date('2026-04-23T10:00:00.000Z'),
+  });
+
+  try {
+    const app = createApp(seeded.database);
+    const response = await app.request(
+      '/filters?limit=1&dimensions=artist,format,genre',
+    );
+    assert.equal(response.status, 200);
+
+    const payload = (await response.json()) as {
+      data: {
+        addedYears: Array<{ value: string }>;
+        artists: Array<{ value: string }>;
+        countries: Array<{ value: string }>;
+        formats: Array<{ value: string }>;
+        genres: Array<{ value: string }>;
+        labels: Array<{ value: string }>;
+        releaseYears: Array<{ value: string }>;
+        styles: Array<{ value: string }>;
+      };
+      meta: { dimensions: string[]; limit: number };
+    };
+
+    assert.deepEqual(payload.meta, {
+      limit: 1,
+      dimensions: ['artist', 'format', 'genre'],
+    });
+    assert.equal(payload.data.artists[0]?.value, 'Alpha Artist');
+    assert.equal(payload.data.formats[0]?.value, 'CD');
+    assert.equal(payload.data.genres[0]?.value, 'Rock');
+    assert.deepEqual(payload.data.labels, []);
+    assert.deepEqual(payload.data.styles, []);
+    assert.deepEqual(payload.data.countries, []);
+    assert.deepEqual(payload.data.releaseYears, []);
+    assert.deepEqual(payload.data.addedYears, []);
+
+    const invalidResponse = await app.request('/filters?dimensions=decade');
+    assert.equal(invalidResponse.status, 400);
+    assert.deepEqual(await invalidResponse.json(), {
+      error:
+        'dimensions must be a comma-separated list of: artist, label, format, genre, style, country, release_year, added_year',
+    });
+  } finally {
+    seeded.cleanup();
+  }
+});
+
 test('GET /health reports a successful local sync snapshot', async () => {
   const seeded = await seedFixtureImport({
     now: () => new Date('2026-04-23T10:00:00.000Z'),
@@ -743,7 +793,60 @@ test('cacheable API endpoints support ETag revalidation', async () => {
     await assertCacheRevalidation(app, '/stats/summary');
     await assertCacheRevalidation(app, '/stats/dashboard?limit=1');
     await assertCacheRevalidation(app, '/filters?limit=1');
+    await assertCacheRevalidation(
+      app,
+      '/filters?limit=1&dimensions=artist,format,genre',
+    );
     await assertCacheRevalidation(app, '/stats/breakdowns/artist');
+  } finally {
+    seeded.cleanup();
+  }
+});
+
+test('collection-version ETags short-circuit expensive filter queries on revalidation', async () => {
+  const seeded = await seedFixtureImport({
+    now: () => new Date('2026-04-23T10:00:00.000Z'),
+  });
+
+  try {
+    const seededApp = createApp(seeded.database);
+    const initialResponse = await seededApp.request('/filters?limit=1');
+    const etag = initialResponse.headers.get('etag');
+    assert.ok(etag);
+
+    let queryAllCalls = 0;
+    const revalidationDatabase = Object.create(
+      seeded.database,
+    ) as typeof seeded.database;
+    revalidationDatabase.queryOne = async <T>(sql: string) => {
+      if (
+        sql ===
+        "SELECT value FROM sync_state WHERE key = 'last_successful_sync_at'"
+      ) {
+        return {
+          value: '2026-04-23T10:00:00.000Z',
+        } as T;
+      }
+
+      throw new Error('unexpected queryOne during revalidation');
+    };
+    revalidationDatabase.queryAll = async () => {
+      queryAllCalls += 1;
+      throw new Error('unexpected queryAll during revalidation');
+    };
+
+    const revalidationApp = createApp(revalidationDatabase);
+    const revalidatedResponse = await revalidationApp.request(
+      '/filters?limit=1',
+      {
+        headers: {
+          'if-none-match': etag ?? '',
+        },
+      },
+    );
+
+    assert.equal(revalidatedResponse.status, 304);
+    assert.equal(queryAllCalls, 0);
   } finally {
     seeded.cleanup();
   }

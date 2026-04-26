@@ -3,10 +3,12 @@ import test from 'node:test';
 
 import {
   parseBreakdownDimension,
+  parseBreakdownDimensions,
   parseFacetLimit,
   parseRecordsQuery,
   parseReleaseId,
   validateAllowedQueryKeys,
+  validateFilterCatalogQueryKeys,
   validateLimitOnlyQueryKeys,
   validateRecordsQueryKeys,
 } from '../src/http/validation.js';
@@ -71,6 +73,12 @@ test('records validation rejects unsupported query keys in sorted error order', 
     () => validateLimitOnlyQueryKeys({ limit: '5', genre: 'Rock' }, '/filters'),
     /\/filters does not support query parameter\(s\): genre/,
   );
+  assert.doesNotThrow(() =>
+    validateFilterCatalogQueryKeys({
+      limit: '5',
+      dimensions: 'artist,genre',
+    }),
+  );
 });
 
 test('records validation rejects invalid positive integers, ranges, and order values', () => {
@@ -80,6 +88,17 @@ test('records validation rejects invalid positive integers, ranges, and order va
     sort: 'date_added',
     order: 'desc',
   });
+  assert.deepEqual(
+    parseRecordsQuery({ artist: '  Alpha Artist ', label: ' Aurora Audio ' }),
+    {
+      page: 1,
+      pageSize: 25,
+      sort: 'date_added',
+      order: 'desc',
+      artist: 'Alpha Artist',
+      label: 'Aurora Audio',
+    },
+  );
   assert.deepEqual(
     parseRecordsQuery({ year_from: ' 1999 ', year_to: '1999' }),
     {
@@ -190,8 +209,21 @@ test('facet, release, and breakdown validation reject malformed values', () => {
   );
 
   assert.equal(parseBreakdownDimension('artist'), 'artist');
+  assert.deepEqual(parseBreakdownDimensions(undefined), undefined);
+  assert.deepEqual(parseBreakdownDimensions('genre, artist,genre'), [
+    'artist',
+    'genre',
+  ]);
   assert.throws(
     () => parseBreakdownDimension('decade'),
     /dimension must be one of: artist, label, format, genre, style, country, release_year, added_year/,
+  );
+  assert.throws(
+    () => parseBreakdownDimensions('decade'),
+    /dimensions must be a comma-separated list of: artist, label, format, genre, style, country, release_year, added_year/,
+  );
+  assert.throws(
+    () => parseBreakdownDimensions(' , '),
+    /dimensions must include at least one of: artist, label, format, genre, style, country, release_year, added_year/,
   );
 });

@@ -1,6 +1,7 @@
-import type {
-  BreakdownDimension,
-  RecordsQueryInput,
+import {
+  allowedBreakdownDimensions,
+  type BreakdownDimension,
+  type RecordsQueryInput,
 } from '../http/validation.js';
 import type { DatabaseClient } from '../lib/database.js';
 
@@ -677,7 +678,26 @@ export class RecordsRepository {
     }));
   }
 
-  async getFilterCatalog(limit: number): Promise<FilterCatalog> {
+  async getCollectionVersion(): Promise<string> {
+    const row = await this.database.queryOne<{ value: string }>(
+      "SELECT value FROM sync_state WHERE key = 'last_successful_sync_at'",
+    );
+
+    return row?.value ?? 'empty';
+  }
+
+  async getFilterCatalog(limit: number): Promise<FilterCatalog>;
+  async getFilterCatalog(
+    limit: number,
+    options: { dimensions?: BreakdownDimension[] },
+  ): Promise<FilterCatalog>;
+  async getFilterCatalog(
+    limit: number,
+    options?: { dimensions?: BreakdownDimension[] },
+  ): Promise<FilterCatalog> {
+    const requestedDimensions = new Set(
+      options?.dimensions ?? allowedBreakdownDimensions,
+    );
     const [
       summary,
       releaseYearRange,
@@ -692,14 +712,30 @@ export class RecordsRepository {
     ] = await Promise.all([
       this.getStatsSummary(),
       this.getReleaseYearRange(),
-      this.getBreakdown('artist', { limit }),
-      this.getBreakdown('label', { limit }),
-      this.getBreakdown('format', { limit }),
-      this.getBreakdown('genre', { limit }),
-      this.getBreakdown('style', { limit }),
-      this.getBreakdown('country', { limit }),
-      this.getBreakdown('release_year', { limit }),
-      this.getBreakdown('added_year', { limit }),
+      requestedDimensions.has('artist')
+        ? this.getBreakdown('artist', { limit })
+        : Promise.resolve([]),
+      requestedDimensions.has('label')
+        ? this.getBreakdown('label', { limit })
+        : Promise.resolve([]),
+      requestedDimensions.has('format')
+        ? this.getBreakdown('format', { limit })
+        : Promise.resolve([]),
+      requestedDimensions.has('genre')
+        ? this.getBreakdown('genre', { limit })
+        : Promise.resolve([]),
+      requestedDimensions.has('style')
+        ? this.getBreakdown('style', { limit })
+        : Promise.resolve([]),
+      requestedDimensions.has('country')
+        ? this.getBreakdown('country', { limit })
+        : Promise.resolve([]),
+      requestedDimensions.has('release_year')
+        ? this.getBreakdown('release_year', { limit })
+        : Promise.resolve([]),
+      requestedDimensions.has('added_year')
+        ? this.getBreakdown('added_year', { limit })
+        : Promise.resolve([]),
     ]);
 
     return {

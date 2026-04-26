@@ -66,6 +66,7 @@ Localhost requests bypass API-key checks. Non-local requests must send either `x
 - `GET /stats/breakdowns/:dimension`
 
 The API returns cache headers and ETags for read responses. Validation errors return `400`.
+`GET /filters` accepts optional `dimensions=artist,format,genre` style narrowing and returns empty arrays for omitted dimensions so the response shape stays stable.
 When `API_READ_KEY` is configured, non-local requests require an API key and return `401` if it is missing or invalid.
 The OpenAPI document is exposed at `GET /openapi.json` for consumers that want to generate client types or SDKs on their own side.
 `GET /stats/summary` includes collection totals, numeric collection value fields, and first/last added timestamps from the latest successful cached import.
