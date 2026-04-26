@@ -8,13 +8,12 @@ import {
 import { buildOpenApiDocument } from '../openapi/spec.js';
 import { RecordsRepository } from '../repositories/records-repository.js';
 import {
-  allowedBreakdownDimensions,
-  type BreakdownDimension,
   parseBreakdownDimension,
   parseBreakdownDimensions,
   parseFacetLimit,
   parseRecordsQuery,
   parseReleaseId,
+  type RecordsQueryInput,
   validateAllowedQueryKeys,
   validateFilterCatalogQueryKeys,
   validateLimitOnlyQueryKeys,
@@ -59,28 +58,40 @@ function cacheOptions(context: Context): { ifNoneMatch: string | null } {
   };
 }
 
-function buildCanonicalRouteKey(
-  path: string,
-  params: Record<string, number | string | undefined>,
-): string {
-  const searchParams = new URLSearchParams();
-
-  for (const [key, value] of Object.entries(params).sort(([left], [right]) =>
-    left.localeCompare(right),
-  )) {
-    if (value === undefined) {
-      continue;
-    }
-
+function appendRouteKeyParam(
+  searchParams: URLSearchParams,
+  key: string,
+  value: number | string | undefined,
+): void {
+  if (value !== undefined) {
     searchParams.set(key, String(value));
   }
+}
 
-  const query = searchParams.toString();
-  return query ? `${path}?${query}` : path;
+function buildRecordsRouteKey(query: RecordsQueryInput): string {
+  const searchParams = new URLSearchParams();
+
+  appendRouteKeyParam(searchParams, 'q', query.q);
+  appendRouteKeyParam(searchParams, 'artist', query.artist);
+  appendRouteKeyParam(searchParams, 'label', query.label);
+  appendRouteKeyParam(searchParams, 'genre', query.genre);
+  appendRouteKeyParam(searchParams, 'style', query.style);
+  appendRouteKeyParam(searchParams, 'format', query.format);
+  appendRouteKeyParam(searchParams, 'country', query.country);
+  appendRouteKeyParam(searchParams, 'year_from', query.yearFrom);
+  appendRouteKeyParam(searchParams, 'year_to', query.yearTo);
+  appendRouteKeyParam(searchParams, 'added_from', query.addedFrom);
+  appendRouteKeyParam(searchParams, 'added_to', query.addedTo);
+  searchParams.set('page', String(query.page));
+  searchParams.set('page_size', String(query.pageSize));
+  searchParams.set('sort', query.sort);
+  searchParams.set('order', query.order);
+
+  return `/records?${searchParams.toString()}`;
 }
 
 function createCollectionEtag(version: string, routeKey: string): string {
-  return createOpaqueEtag('collection', version, routeKey);
+  return createOpaqueEtag(version, routeKey);
 }
 
 async function respondIfCollectionUnchanged(
@@ -96,18 +107,6 @@ async function respondIfCollectionUnchanged(
   }
 
   return etag;
-}
-
-function normalizeFilterDimensions(
-  dimensions: BreakdownDimension[] | undefined,
-): string | undefined {
-  if (!dimensions) {
-    return undefined;
-  }
-
-  return allowedBreakdownDimensions
-    .filter((dimension) => dimensions.includes(dimension))
-    .join(',');
 }
 
 export function createApp(
@@ -237,7 +236,7 @@ export function createApp(
 
   app.get('/health', async (context) => {
     validateAllowedQueryKeys(context.req.query(), new Set(), '/health');
-    const routeKey = buildCanonicalRouteKey('/health', {});
+    const routeKey = '/health';
     const etagOrResponse = await respondIfCollectionUnchanged(
       context,
       recordsRepository,
@@ -268,23 +267,7 @@ export function createApp(
     const rawQuery = context.req.query();
     validateRecordsQueryKeys(rawQuery);
     const query = parseRecordsQuery(rawQuery);
-    const routeKey = buildCanonicalRouteKey('/records', {
-      q: query.q,
-      artist: query.artist,
-      label: query.label,
-      genre: query.genre,
-      style: query.style,
-      format: query.format,
-      country: query.country,
-      year_from: query.yearFrom,
-      year_to: query.yearTo,
-      added_from: query.addedFrom,
-      added_to: query.addedTo,
-      page: query.page,
-      page_size: query.pageSize,
-      sort: query.sort,
-      order: query.order,
-    });
+    const routeKey = buildRecordsRouteKey(query);
     const etagOrResponse = await respondIfCollectionUnchanged(
       context,
       recordsRepository,
@@ -368,7 +351,7 @@ export function createApp(
 
   app.get('/stats/summary', async (context) => {
     validateAllowedQueryKeys(context.req.query(), new Set(), '/stats/summary');
-    const routeKey = buildCanonicalRouteKey('/stats/summary', {});
+    const routeKey = '/stats/summary';
     const etagOrResponse = await respondIfCollectionUnchanged(
       context,
       recordsRepository,
@@ -393,7 +376,7 @@ export function createApp(
     const rawQuery = context.req.query();
     validateLimitOnlyQueryKeys(rawQuery, '/stats/dashboard');
     const limit = parseFacetLimit(rawQuery.limit);
-    const routeKey = buildCanonicalRouteKey('/stats/dashboard', { limit });
+    const routeKey = `/stats/dashboard?limit=${limit}`;
     const etagOrResponse = await respondIfCollectionUnchanged(
       context,
       recordsRepository,
@@ -422,10 +405,9 @@ export function createApp(
     validateFilterCatalogQueryKeys(rawQuery);
     const limit = parseFacetLimit(rawQuery.limit);
     const dimensions = parseBreakdownDimensions(rawQuery.dimensions);
-    const routeKey = buildCanonicalRouteKey('/filters', {
-      limit,
-      dimensions: normalizeFilterDimensions(dimensions),
-    });
+    const routeKey = dimensions
+      ? `/filters?limit=${limit}&dimensions=${dimensions.join(',')}`
+      : `/filters?limit=${limit}`;
     const etagOrResponse = await respondIfCollectionUnchanged(
       context,
       recordsRepository,
@@ -460,10 +442,7 @@ export function createApp(
     );
 
     const dimension = parseBreakdownDimension(context.req.param('dimension'));
-    const routeKey = buildCanonicalRouteKey(
-      `/stats/breakdowns/${dimension}`,
-      {},
-    );
+    const routeKey = `/stats/breakdowns/${dimension}`;
     const etagOrResponse = await respondIfCollectionUnchanged(
       context,
       recordsRepository,

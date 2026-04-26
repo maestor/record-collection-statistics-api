@@ -852,6 +852,69 @@ test('collection-version ETags short-circuit expensive filter queries on revalid
   }
 });
 
+test('collection-version ETags vary by canonical route key semantics', async () => {
+  const seeded = await seedFixtureImport({
+    now: () => new Date('2026-04-23T10:00:00.000Z'),
+  });
+
+  try {
+    const app = createApp(seeded.database);
+
+    const healthEtag = (await app.request('/health')).headers.get('etag');
+    const summaryEtag = (await app.request('/stats/summary')).headers.get(
+      'etag',
+    );
+    const recordsTitleEtag = (
+      await app.request('/records?page_size=1&sort=title&order=asc')
+    ).headers.get('etag');
+    const recordsYearEtag = (
+      await app.request('/records?page_size=1&sort=release_year&order=asc')
+    ).headers.get('etag');
+    const filteredRecordsEtag = (
+      await app.request('/records?artist=Alpha%20Artist')
+    ).headers.get('etag');
+    const dashboardOneEtag = (
+      await app.request('/stats/dashboard?limit=1')
+    ).headers.get('etag');
+    const dashboardTwoEtag = (
+      await app.request('/stats/dashboard?limit=2')
+    ).headers.get('etag');
+    const filterCanonicalEtag = (
+      await app.request('/filters?limit=1&dimensions=artist,format,genre')
+    ).headers.get('etag');
+    const filterReorderedEtag = (
+      await app.request('/filters?dimensions=genre,artist,format&limit=1')
+    ).headers.get('etag');
+    const filterLabelEtag = (
+      await app.request('/filters?limit=1&dimensions=label')
+    ).headers.get('etag');
+    const detail101Etag = (await app.request('/records/101')).headers.get(
+      'etag',
+    );
+    const detail202Etag = (await app.request('/records/202')).headers.get(
+      'etag',
+    );
+    const artistBreakdownEtag = (
+      await app.request('/stats/breakdowns/artist')
+    ).headers.get('etag');
+    const labelBreakdownEtag = (
+      await app.request('/stats/breakdowns/label')
+    ).headers.get('etag');
+
+    assert.ok(healthEtag);
+    assert.notEqual(healthEtag, summaryEtag);
+    assert.notEqual(recordsTitleEtag, recordsYearEtag);
+    assert.notEqual(recordsTitleEtag, filteredRecordsEtag);
+    assert.notEqual(dashboardOneEtag, dashboardTwoEtag);
+    assert.equal(filterCanonicalEtag, filterReorderedEtag);
+    assert.notEqual(filterCanonicalEtag, filterLabelEtag);
+    assert.notEqual(detail101Etag, detail202Etag);
+    assert.notEqual(artistBreakdownEtag, labelBreakdownEtag);
+  } finally {
+    seeded.cleanup();
+  }
+});
+
 test('API validation errors include the endpoint that rejected extra query parameters', async () => {
   const seeded = await seedFixtureImport({
     now: () => new Date('2026-04-23T10:00:00.000Z'),

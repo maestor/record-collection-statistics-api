@@ -223,6 +223,10 @@ test('facet, release, and breakdown validation reject malformed values', () => {
     /dimensions must be a comma-separated list of: artist, label, format, genre, style, country, release_year, added_year/,
   );
   assert.throws(
+    () => parseBreakdownDimensions('artist,decade'),
+    /dimensions must be a comma-separated list of: artist, label, format, genre, style, country, release_year, added_year/,
+  );
+  assert.throws(
     () => parseBreakdownDimensions(' , '),
     /dimensions must include at least one of: artist, label, format, genre, style, country, release_year, added_year/,
   );
