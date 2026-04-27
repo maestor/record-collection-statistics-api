@@ -18,10 +18,10 @@
 ## Quality
 - Run `npm run verify` after meaningful backend changes.
 - Pull requests against `main` must pass the GitHub Actions `Verify` workflow, which runs `npm run verify`.
-- Mutation testing is opt-in: never run `npm run test:mutation` unless the user explicitly requests it in the current task, even for validation, importer mapping, or other core logic changes.
+- Mutation testing can be run whenever it is a reasonable validation step for the task. Prefer `npm run verify` by default, and use `npm run test:mutation` when mutation coverage is relevant enough to justify the extra runtime.
 - Add integration fixtures for Discogs payload changes before changing importer mapping logic.
 - Preserve backwards-compatible response shapes unless the user asks for a breaking change.
-- Keep `npm run verify` fast for routine development, and use `npm run test:mutation` only when the user specifically asks for the stronger mutation-testing signal.
+- Keep `npm run verify` fast for routine development. Use `npm run test:mutation` selectively so the stronger mutation-testing signal stays practical alongside the incremental Stryker workflow.
 - Keep the basic coverage gate strict: line and function coverage should stay at `100%`, with branch coverage kept near the current high-water mark instead of capped loosely.
 - Treat surviving mutants, no-coverage mutants, and timeout mutants as quality failures. A clean mutation run should have `100%` score with `0` survived, `0` no coverage, and `0` timed out.
 - Keep mutation test files ordered from focused and fast to broad and slow, so mutants are killed by the smallest relevant suite before full API integration tests run.

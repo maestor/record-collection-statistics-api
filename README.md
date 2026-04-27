@@ -31,7 +31,7 @@ Local-first backend for importing a Discogs collection into SQLite and serving a
 - `vercel dev` runs the same app through Vercel's local runtime when you want to test the deployment shape
 - `npm run test` runs integration-style tests
 - `npm run verify` runs typecheck, lint, and tests
-- `npm run test:mutation` runs scoped mutation testing for core validation and importer logic
+- `npm run test:mutation` runs scoped mutation testing for core API, importer, and repository logic
 
 ## Deployment
 See [docs/deployment.md](docs/deployment.md) for Vercel and Turso deployment notes.
@@ -81,7 +81,7 @@ The OpenAPI document is exposed at `GET /openapi.json` for consumers that want t
 ## Quality
 - Tests focus on importer and API behavior rather than duplicating the same logic in isolated unit tests.
 - Mutation testing is now wired through Stryker as a deeper quality signal, and it is intentionally kept out of the default `verify` path so routine local checks stay fast.
-- The initial mutation scope targets `src/http/validation.ts` and `src/importer/mappers.ts`.
+- Mutation runs use Stryker incremental mode and capped worker concurrency so repeated local automation stays more practical on older laptops without reducing test scope.
 
 ## Future Direction
 - Keep repository and SQL boundaries small enough to support local SQLite and remote Turso through the same repository API.
