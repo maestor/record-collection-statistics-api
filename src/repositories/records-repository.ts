@@ -546,6 +546,26 @@ export class RecordsRepository {
     };
   }
 
+  async getRandomRecordDetail(): Promise<RecordDetail | null> {
+    const row = await this.database.queryOne<{ release_id: number }>(`
+      SELECT r.release_id
+      FROM releases r
+      WHERE EXISTS (
+        SELECT 1
+        FROM collection_items ci
+        WHERE ci.release_id = r.release_id
+      )
+      ORDER BY RANDOM()
+      LIMIT 1
+    `);
+
+    if (!row) {
+      return null;
+    }
+
+    return this.getRecordDetail(Number(row.release_id));
+  }
+
   private async listFormatsForReleaseIds(
     releaseIds: number[],
   ): Promise<Map<number, RecordListItem['formats']>> {

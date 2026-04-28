@@ -245,6 +245,7 @@ test('GET / exposes API discovery details', async () => {
         openapi: '/openapi.json',
         filters: '/filters?limit=25',
         records: '/records',
+        randomRecord: '/records/random',
         recordDetail: '/records/:releaseId',
         statsSummary: '/stats/summary',
         statsDashboard: '/stats/dashboard?limit=10',
@@ -323,6 +324,7 @@ test('GET /openapi.json exposes the OpenAPI document', async () => {
     assert.equal(payload.openapi, '3.1.0');
     assert.equal(payload.info.title, 'Record Collection Statistics API');
     assert.ok(payload.paths['/records']);
+    assert.ok(payload.paths['/records/random']);
     assert.ok(payload.paths['/openapi.json']);
     assert.ok(payload.components.schemas.RecordDetail);
     assert.deepEqual(
@@ -601,6 +603,77 @@ test('GET /records/:releaseId returns detailed release data with collection fiel
     });
   } finally {
     seeded.cleanup();
+  }
+});
+
+test('GET /records/random returns one cached release detail and rejects unsupported query params', async () => {
+  const { database, cleanup } = await createTempDatabase();
+  const collectionVersion = '2026-04-23T10:00:00.000Z';
+
+  try {
+    await insertCollectedRelease(database, {
+      releaseId: 303,
+      instanceId: 3001,
+      title: 'Single Random Pick',
+      artistName: 'Solo Artist',
+      labelName: 'Only Label',
+      country: 'Sweden',
+      releaseYear: 2012,
+      dateAdded: collectionVersion,
+    });
+    await database.execute(
+      "INSERT INTO sync_state (key, value, updated_at) VALUES ('last_successful_sync_at', ?, ?)",
+      [collectionVersion, collectionVersion],
+    );
+
+    const app = createApp(database);
+    const response = await app.request('/records/random');
+    assert.equal(response.status, 200);
+    assert.equal(
+      response.headers.get('etag'),
+      createOpaqueEtag(collectionVersion, '/records/random'),
+    );
+
+    const payload = (await response.json()) as {
+      data: {
+        artists: Array<{ name: string }>;
+        collectionItems: Array<{ instanceId: number }>;
+        country: string | null;
+        releaseId: number;
+        releaseYear: number | null;
+        title: string;
+      };
+    };
+
+    assert.equal(payload.data.releaseId, 303);
+    assert.equal(payload.data.title, 'Single Random Pick');
+    assert.equal(payload.data.releaseYear, 2012);
+    assert.equal(payload.data.country, 'Sweden');
+    assert.equal(payload.data.artists[0]?.name, 'Solo Artist');
+    assert.equal(payload.data.collectionItems[0]?.instanceId, 3001);
+
+    const invalidResponse = await app.request('/records/random?page=2');
+    assert.equal(invalidResponse.status, 400);
+    assert.deepEqual(await invalidResponse.json(), {
+      error: '/records/random does not support query parameter(s): page',
+    });
+  } finally {
+    cleanup();
+  }
+});
+
+test('GET /records/random returns 404 when the local collection cache is empty', async () => {
+  const { database, cleanup } = await createTempDatabase();
+
+  try {
+    const app = createApp(database);
+    const response = await app.request('/records/random');
+    assert.equal(response.status, 404);
+    assert.deepEqual(await response.json(), {
+      error: 'No cached releases were found in the local collection cache.',
+    });
+  } finally {
+    cleanup();
   }
 });
 
@@ -1102,6 +1175,7 @@ test('cacheable API endpoints support ETag revalidation', async () => {
     await assertCacheRevalidation(app, '/');
     await assertCacheRevalidation(app, '/openapi.json');
     await assertCacheRevalidation(app, '/health');
+    await assertCacheRevalidation(app, '/records/random');
     await assertCacheRevalidation(app, '/records/101');
     await assertCacheRevalidation(app, '/stats/summary');
     await assertCacheRevalidation(app, '/stats/dashboard?limit=1');
