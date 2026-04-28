@@ -59,6 +59,20 @@ const recordsQueryKeys = new Set([
   'order',
 ]);
 
+const randomRecordQueryKeys = new Set([
+  'q',
+  'artist',
+  'label',
+  'genre',
+  'style',
+  'format',
+  'country',
+  'year_from',
+  'year_to',
+  'added_from',
+  'added_to',
+]);
+
 const limitOnlyQueryKeys = new Set(['limit']);
 const filterCatalogQueryKeys = new Set(['limit', 'dimensions']);
 
@@ -84,6 +98,12 @@ export function validateRecordsQueryKeys(
   rawQuery: Record<string, string | undefined>,
 ): void {
   validateAllowedQueryKeys(rawQuery, recordsQueryKeys, '/records');
+}
+
+export function validateRandomRecordQueryKeys(
+  rawQuery: Record<string, string | undefined>,
+): void {
+  validateAllowedQueryKeys(rawQuery, randomRecordQueryKeys, '/records/random');
 }
 
 export function validateLimitOnlyQueryKeys(

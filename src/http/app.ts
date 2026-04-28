@@ -18,6 +18,7 @@ import {
   validateAllowedQueryKeys,
   validateFilterCatalogQueryKeys,
   validateLimitOnlyQueryKeys,
+  validateRandomRecordQueryKeys,
   validateRecordsQueryKeys,
 } from './validation.js';
 
@@ -314,13 +315,18 @@ export function createApp(
   });
 
   app.get('/records/random', async (context) => {
-    validateAllowedQueryKeys(context.req.query(), new Set(), '/records/random');
+    const rawQuery = context.req.query();
+    validateRandomRecordQueryKeys(rawQuery);
+    const query = parseRecordsQuery(rawQuery);
 
-    const record = await recordsRepository.getRandomRecordDetail();
+    const record = await recordsRepository.getRandomRecordDetail(query);
     if (!record) {
       return context.json(
         {
-          error: 'No cached releases were found in the local collection cache.',
+          error:
+            Object.keys(rawQuery).length === 0
+              ? 'No cached releases were found in the local collection cache.'
+              : 'No cached releases matched the requested random record filters.',
         },
         404,
       );

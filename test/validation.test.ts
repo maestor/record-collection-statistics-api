@@ -10,6 +10,7 @@ import {
   validateAllowedQueryKeys,
   validateFilterCatalogQueryKeys,
   validateLimitOnlyQueryKeys,
+  validateRandomRecordQueryKeys,
   validateRecordsQueryKeys,
 } from '../src/http/validation.js';
 
@@ -72,6 +73,25 @@ test('records validation rejects unsupported query keys in sorted error order', 
   assert.throws(
     () => validateLimitOnlyQueryKeys({ limit: '5', genre: 'Rock' }, '/filters'),
     /\/filters does not support query parameter\(s\): genre/,
+  );
+  assert.doesNotThrow(() =>
+    validateRandomRecordQueryKeys({
+      q: 'Northern',
+      artist: 'Alpha Artist',
+      label: 'Aurora Audio',
+      genre: 'Rock',
+      style: 'Indie Rock',
+      format: 'CD',
+      country: 'Finland',
+      year_from: '1999',
+      year_to: '2005',
+      added_from: '2024-01-02',
+      added_to: '2024-01-03',
+    }),
+  );
+  assert.throws(
+    () => validateRandomRecordQueryKeys({ page: '2', sort: 'title' }),
+    /\/records\/random does not support query parameter\(s\): page, sort/,
   );
   assert.doesNotThrow(() =>
     validateFilterCatalogQueryKeys({

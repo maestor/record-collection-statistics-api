@@ -546,18 +546,20 @@ export class RecordsRepository {
     };
   }
 
-  async getRandomRecordDetail(): Promise<RecordDetail | null> {
-    const row = await this.database.queryOne<{ release_id: number }>(`
+  async getRandomRecordDetail(
+    query: RecordsQueryInput,
+  ): Promise<RecordDetail | null> {
+    const { whereSql, params } = buildRecordFilters(query);
+    const row = await this.database.queryOne<{ release_id: number }>(
+      `
       SELECT r.release_id
       FROM releases r
-      WHERE EXISTS (
-        SELECT 1
-        FROM collection_items ci
-        WHERE ci.release_id = r.release_id
-      )
+      WHERE ${whereSql}
       ORDER BY RANDOM()
       LIMIT 1
-    `);
+    `,
+      params,
+    );
 
     if (!row) {
       return null;
