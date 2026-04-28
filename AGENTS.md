@@ -18,6 +18,7 @@
 ## Quality
 - Run `npm run verify` after meaningful backend changes.
 - Pull requests against `main` must pass the GitHub Actions `Verify` workflow, which runs `npm run verify`.
+- For new development work that falls within the scope of `npm run test:coverage` and needs tests, use `$intelligence-testing` as the default workflow unless the user explicitly asks for a different approach.
 - Mutation testing can be run whenever it is a reasonable validation step for the task. Prefer `npm run verify` by default, and use `npm run test:mutation` when mutation coverage is relevant enough to justify the extra runtime.
 - Add integration fixtures for Discogs payload changes before changing importer mapping logic.
 - Preserve backwards-compatible response shapes unless the user asks for a breaking change.
@@ -30,6 +31,12 @@
 - Use coverage ignores only for type-only/source-map artifacts or explicitly unreachable platform branches after considering a realistic test or refactor first. Add a short nearby comment explaining why the ignore exists.
 - Keep README focused on project overview and user-facing basics. Put detailed deployment, development, and testing procedures under `docs/` and link to them from README when needed.
 - Treat `docs/plans/` as local planning scratch space. Do not commit plan files by default; only commit them when the user explicitly asks for a plan to be preserved in the repository.
+
+## Local Skills
+- Use `$api-contract-sync` when backend API changes could drift from OpenAPI output, fixtures, generated clients, or external consumers.
+- Use `$intelligence-testing` by default for new development work that is covered by `npm run test:coverage` and requires tests, especially importer, repository, and API behavior work.
+- Use `$local-first-verification` when choosing the cheapest honest local verification path before handoff, review, or commit.
+- Use `$mutation-testing` when backend branching, validation, repository SQL, or importer logic deserves a scoped Stryker run beyond the default `verify` gate.
 
 ## Commit Strategy
 - Before starting edits, check the current git branch. If it is `main`, pause and ask the user to create or switch to a suitable working branch for the task.
