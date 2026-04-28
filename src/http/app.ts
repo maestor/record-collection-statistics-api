@@ -177,6 +177,7 @@ export function createApp(
           openapi: '/openapi.json',
           filters: '/filters?limit=25',
           records: '/records',
+          randomRecord: '/records/random',
           recordDetail: '/records/:releaseId',
           statsSummary: '/stats/summary',
           statsDashboard: '/stats/dashboard?limit=10',
@@ -303,6 +304,40 @@ export function createApp(
           sort: query.sort,
           order: query.order,
         },
+      },
+      {
+        ...cacheOptions(context),
+        etag: etagOrResponse,
+      },
+    );
+  });
+
+  app.get('/records/random', async (context) => {
+    validateAllowedQueryKeys(context.req.query(), new Set(), '/records/random');
+
+    const routeKey = '/records/random';
+    const etagOrResponse = await respondIfCollectionUnchanged(
+      context,
+      recordsRepository,
+      routeKey,
+    );
+    if (etagOrResponse instanceof Response) {
+      return etagOrResponse;
+    }
+
+    const record = await recordsRepository.getRandomRecordDetail();
+    if (!record) {
+      return context.json(
+        {
+          error: 'No cached releases were found in the local collection cache.',
+        },
+        404,
+      );
+    }
+
+    return createJsonCacheResponse(
+      {
+        data: record,
       },
       {
         ...cacheOptions(context),

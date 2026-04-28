@@ -486,6 +486,7 @@ export function buildOpenApiDocument() {
                           'openapi',
                           'filters',
                           'records',
+                          'randomRecord',
                           'recordDetail',
                           'statsSummary',
                           'statsDashboard',
@@ -496,6 +497,7 @@ export function buildOpenApiDocument() {
                           openapi: { type: 'string' },
                           filters: { type: 'string' },
                           records: { type: 'string' },
+                          randomRecord: { type: 'string' },
                           recordDetail: { type: 'string' },
                           statsSummary: { type: 'string' },
                           statsDashboard: { type: 'string' },
@@ -773,6 +775,40 @@ export function buildOpenApiDocument() {
             },
             '404': {
               description: 'Release not found in local cache.',
+              content: {
+                [jsonContentType]: {
+                  schema: { $ref: '#/components/schemas/ErrorResponse' },
+                },
+              },
+            },
+            ...commonErrorResponses,
+          },
+        },
+      },
+      '/records/random': {
+        get: {
+          tags: ['Records'],
+          summary: 'Get one random cached release from the collection.',
+          operationId: 'getRandomRecord',
+          responses: {
+            '200': {
+              description: 'Detailed metadata for a random cached release.',
+              content: {
+                [jsonContentType]: {
+                  schema: {
+                    type: 'object',
+                    additionalProperties: false,
+                    required: ['data'],
+                    properties: {
+                      data: { $ref: '#/components/schemas/RecordDetail' },
+                    },
+                  },
+                },
+              },
+            },
+            '404': {
+              description:
+                'No cached releases are available in the local cache.',
               content: {
                 [jsonContentType]: {
                   schema: { $ref: '#/components/schemas/ErrorResponse' },
