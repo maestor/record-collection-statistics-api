@@ -359,6 +359,26 @@ test('GET /openapi.json exposes the OpenAPI document', async () => {
       ).get.parameters.find((parameter) => parameter.name === 'q')?.description,
       'Case-insensitive free-text match against title, artist, label, format descriptions, and format free text.',
     );
+    assert.deepEqual(
+      (
+        payload.paths['/records/random'] as {
+          get: { parameters: Array<{ name: string }> };
+        }
+      ).get.parameters.map((parameter) => parameter.name),
+      [
+        'q',
+        'artist',
+        'label',
+        'genre',
+        'style',
+        'format',
+        'country',
+        'year_from',
+        'year_to',
+        'added_from',
+        'added_to',
+      ],
+    );
 
     const invalidResponse = await app.request('/openapi.json?limit=1');
     assert.equal(invalidResponse.status, 400);
@@ -688,6 +708,66 @@ test('GET /records/random returns 404 when the local collection cache is empty',
     });
   } finally {
     cleanup();
+  }
+});
+
+test('GET /records/random returns a detailed random release matching filters', async () => {
+  const seeded = await seedFixtureImport({
+    now: () => new Date('2026-04-23T10:00:00.000Z'),
+  });
+
+  try {
+    const app = createApp(seeded.database);
+    const response = await app.request(
+      '/records/random?genre=Jazz&format=Vinyl&year_from=2000&year_to=2009',
+    );
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('etag'), null);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+
+    const payload = (await response.json()) as {
+      data: {
+        formats: Array<{ name: string }>;
+        genres: string[];
+        releaseId: number;
+        releaseYear: number | null;
+        title: string;
+      };
+    };
+
+    assert.equal(payload.data.releaseId, 202);
+    assert.equal(payload.data.title, 'Moonlit Session');
+    assert.equal(payload.data.releaseYear, 2005);
+    assert.deepEqual(payload.data.genres, ['Jazz']);
+    assert.deepEqual(
+      payload.data.formats.map((format) => format.name),
+      ['Vinyl'],
+    );
+
+    const dateAndTextResponse = await app.request(
+      '/records/random?q=Northern&added_from=2024-03-01&added_to=2024-03-31',
+    );
+    assert.equal(dateAndTextResponse.status, 200);
+    const dateAndTextPayload = (await dateAndTextResponse.json()) as {
+      data: { releaseId: number };
+    };
+    assert.equal(dateAndTextPayload.data.releaseId, 101);
+
+    const missingResponse = await app.request(
+      '/records/random?genre=Classical',
+    );
+    assert.equal(missingResponse.status, 404);
+    assert.deepEqual(await missingResponse.json(), {
+      error: 'No cached releases matched the requested random record filters.',
+    });
+
+    const invalidResponse = await app.request('/records/random?sort=title');
+    assert.equal(invalidResponse.status, 400);
+    assert.deepEqual(await invalidResponse.json(), {
+      error: '/records/random does not support query parameter(s): sort',
+    });
+  } finally {
+    seeded.cleanup();
   }
 });
 

@@ -790,8 +790,35 @@ export function buildOpenApiDocument() {
           tags: ['Records'],
           summary: 'Get one random cached release from the collection.',
           description:
-            'Returns a random cached release detail. This endpoint is intentionally not cacheable so repeated requests can return a new random pick.',
+            'Returns a random cached release detail, optionally constrained by the same filters used for records browsing. This endpoint is intentionally not cacheable so repeated requests can return a new random pick.',
           operationId: 'getRandomRecord',
+          parameters: [
+            {
+              in: 'query',
+              name: 'q',
+              description:
+                'Case-insensitive free-text match against title, artist, label, format descriptions, and format free text.',
+              schema: { type: 'string' },
+            },
+            { in: 'query', name: 'artist', schema: { type: 'string' } },
+            { in: 'query', name: 'label', schema: { type: 'string' } },
+            { in: 'query', name: 'genre', schema: { type: 'string' } },
+            { in: 'query', name: 'style', schema: { type: 'string' } },
+            { in: 'query', name: 'format', schema: { type: 'string' } },
+            { in: 'query', name: 'country', schema: { type: 'string' } },
+            { in: 'query', name: 'year_from', schema: { type: 'integer' } },
+            { in: 'query', name: 'year_to', schema: { type: 'integer' } },
+            {
+              in: 'query',
+              name: 'added_from',
+              schema: { type: 'string', format: 'date-time' },
+            },
+            {
+              in: 'query',
+              name: 'added_to',
+              schema: { type: 'string', format: 'date-time' },
+            },
+          ],
           responses: {
             '200': {
               description: 'Detailed metadata for a random cached release.',
@@ -810,7 +837,7 @@ export function buildOpenApiDocument() {
             },
             '404': {
               description:
-                'No cached releases are available in the local cache.',
+                'No cached releases are available in the local cache, or no cached release matches the requested filters.',
               content: {
                 [jsonContentType]: {
                   schema: { $ref: '#/components/schemas/ErrorResponse' },
