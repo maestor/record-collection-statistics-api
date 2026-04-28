@@ -26,12 +26,11 @@ Local-first backend for importing a Discogs collection into SQLite and serving a
 ## Commands
 - `npm run db:migrate` applies SQL migrations to the active database target
 - `npm run import:discogs` syncs the Discogs collection and refreshes stale release details
-- The importer prints the target database and progress to `stderr`, and keeps the final JSON summary on `stdout`
 - `npm run dev` starts the local read-only API
-- `vercel dev` runs the same app through Vercel's local runtime when you want to test the deployment shape
-- `npm run test` runs integration-style tests
-- `npm run verify` runs typecheck, lint, and tests
-- `npm run test:mutation` runs scoped mutation testing for core API, importer, and repository logic
+- `npm run verify` runs the default backend quality gate
+
+## Development
+See [docs/development.md](docs/development.md) for local setup, full command references, verification guidance, and project-local agent skill notes.
 
 ## Deployment
 See [docs/deployment.md](docs/deployment.md) for Vercel and Turso deployment notes.
@@ -77,11 +76,6 @@ The OpenAPI document is exposed at `GET /openapi.json` for consumers that want t
 - Enrich only new or stale release details by default
 - Respect Discogs rate limits with request throttling and retry handling
 - Avoid deleting collection rows until a full sync succeeds
-
-## Quality
-- Tests focus on importer and API behavior rather than duplicating the same logic in isolated unit tests.
-- Mutation testing is now wired through Stryker as a deeper quality signal, and it is intentionally kept out of the default `verify` path so routine local checks stay fast.
-- Mutation runs use Stryker incremental mode and capped worker concurrency so repeated local automation stays more practical on older laptops without reducing test scope.
 
 ## Future Direction
 - Keep repository and SQL boundaries small enough to support local SQLite and remote Turso through the same repository API.
