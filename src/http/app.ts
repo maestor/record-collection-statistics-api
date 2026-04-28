@@ -2,6 +2,7 @@ import { type Context, Hono } from 'hono';
 import type { DatabaseClient } from '../lib/database.js';
 import {
   createJsonCacheResponse,
+  createJsonNoStoreResponse,
   createNotModifiedResponse,
   createOpaqueEtag,
 } from '../lib/http-cache.js';
@@ -315,16 +316,6 @@ export function createApp(
   app.get('/records/random', async (context) => {
     validateAllowedQueryKeys(context.req.query(), new Set(), '/records/random');
 
-    const routeKey = '/records/random';
-    const etagOrResponse = await respondIfCollectionUnchanged(
-      context,
-      recordsRepository,
-      routeKey,
-    );
-    if (etagOrResponse instanceof Response) {
-      return etagOrResponse;
-    }
-
     const record = await recordsRepository.getRandomRecordDetail();
     if (!record) {
       return context.json(
@@ -335,15 +326,9 @@ export function createApp(
       );
     }
 
-    return createJsonCacheResponse(
-      {
-        data: record,
-      },
-      {
-        ...cacheOptions(context),
-        etag: etagOrResponse,
-      },
-    );
+    return createJsonNoStoreResponse({
+      data: record,
+    });
   });
 
   app.get('/records/:releaseId', async (context) => {

@@ -629,10 +629,8 @@ test('GET /records/random returns one cached release detail and rejects unsuppor
     const app = createApp(database);
     const response = await app.request('/records/random');
     assert.equal(response.status, 200);
-    assert.equal(
-      response.headers.get('etag'),
-      createOpaqueEtag(collectionVersion, '/records/random'),
-    );
+    assert.equal(response.headers.get('etag'), null);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
 
     const payload = (await response.json()) as {
       data: {
@@ -651,6 +649,22 @@ test('GET /records/random returns one cached release detail and rejects unsuppor
     assert.equal(payload.data.country, 'Sweden');
     assert.equal(payload.data.artists[0]?.name, 'Solo Artist');
     assert.equal(payload.data.collectionItems[0]?.instanceId, 3001);
+
+    const revalidatedResponse = await app.request('/records/random', {
+      headers: {
+        'if-none-match': '"stale-random-etag"',
+      },
+    });
+    assert.equal(revalidatedResponse.status, 200);
+    assert.equal(revalidatedResponse.headers.get('etag'), null);
+    assert.equal(revalidatedResponse.headers.get('cache-control'), 'no-store');
+
+    const revalidatedPayload = (await revalidatedResponse.json()) as {
+      data: {
+        releaseId: number;
+      };
+    };
+    assert.equal(revalidatedPayload.data.releaseId, 303);
 
     const invalidResponse = await app.request('/records/random?page=2');
     assert.equal(invalidResponse.status, 400);
@@ -1175,7 +1189,6 @@ test('cacheable API endpoints support ETag revalidation', async () => {
     await assertCacheRevalidation(app, '/');
     await assertCacheRevalidation(app, '/openapi.json');
     await assertCacheRevalidation(app, '/health');
-    await assertCacheRevalidation(app, '/records/random');
     await assertCacheRevalidation(app, '/records/101');
     await assertCacheRevalidation(app, '/stats/summary');
     await assertCacheRevalidation(app, '/stats/dashboard?limit=1');

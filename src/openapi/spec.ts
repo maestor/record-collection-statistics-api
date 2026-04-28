@@ -789,6 +789,8 @@ export function buildOpenApiDocument() {
         get: {
           tags: ['Records'],
           summary: 'Get one random cached release from the collection.',
+          description:
+            'Returns a random cached release detail. This endpoint is intentionally not cacheable so repeated requests can return a new random pick.',
           operationId: 'getRandomRecord',
           responses: {
             '200': {
