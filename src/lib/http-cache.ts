@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 const cacheControlValue = 'private, max-age=60, stale-while-revalidate=300';
+const noStoreCacheControlValue = 'no-store';
 
 function createHashDigest(value: string): string {
   return createHash('sha1').update(value).digest('hex');
@@ -41,6 +42,23 @@ export function createJsonCacheResponse(
   }
 
   return new Response(body, {
+    status: options?.status ?? 200,
+    headers,
+  });
+}
+
+export function createJsonNoStoreResponse(
+  payload: unknown,
+  options?: {
+    status?: number;
+  },
+): Response {
+  const headers = new Headers({
+    'Cache-Control': noStoreCacheControlValue,
+    'Content-Type': 'application/json; charset=utf-8',
+  });
+
+  return new Response(JSON.stringify(payload), {
     status: options?.status ?? 200,
     headers,
   });

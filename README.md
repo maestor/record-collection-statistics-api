@@ -65,8 +65,8 @@ Localhost requests bypass API-key checks. Non-local requests must send either `x
 - `GET /stats/summary`
 - `GET /stats/breakdowns/:dimension`
 
-The API returns cache headers and ETags for read responses. Validation errors return `400`.
-`GET /records/random` returns the same detailed payload shape as `GET /records/:releaseId`, but for one random cached release. If the local cache is empty, it returns `404`.
+The API returns cache headers and ETags for read responses unless noted otherwise. Validation errors return `400`.
+`GET /records/random` returns the same detailed payload shape as `GET /records/:releaseId`, but for one random cached release. It is intentionally served with `Cache-Control: no-store` and no ETag so each request can return a fresh random pick. If the local cache is empty, it returns `404`.
 `GET /filters` accepts optional `dimensions=artist,format,genre` style narrowing and returns empty arrays for omitted dimensions so the response shape stays stable. Stats and filter breakdown payloads intentionally omit placeholder values like `artist = "Various"` and `release_year = 0`, while `GET /records` still returns those releases for browsing.
 When `API_READ_KEY` is configured, non-local requests require an API key and return `401` if it is missing or invalid.
 The OpenAPI document is exposed at `GET /openapi.json` for consumers that want to generate client types or SDKs on their own side.
