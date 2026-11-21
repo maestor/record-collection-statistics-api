@@ -62,6 +62,15 @@ Use the repo's stricter rule if it defines one.
 
 Commit in coherent batches when they are ready.
 
+Dependent Git write steps are sequential:
+
+1. run `git add` for the intended files
+2. sanity-check staged scope when needed
+3. run `git commit`
+4. run `git push` only after the commit succeeds
+
+Never run `git add`, `git commit`, and `git push` in parallel. If one step fails, fix it before moving to the next step.
+
 Typical commit prefixes:
 
 - `Feature:`
@@ -77,13 +86,25 @@ Message style:
 - keep the rest in normal sentence style
 - avoid vague messages like `Fix stuff`
 
+Commit body style:
+
+- when the commit is substantial enough to need an extended description, add a short body
+- use the same bullets you expect to place later under PR-notes `Summary` for that commit
+- do not include `Title`, `Summary`, `Verification`, or `Notes` headings in the commit body
+- if multiple commits roll into one PR, keep each commit body limited to its own bullets
+
 ## Push And Handoff
 
 When the batch is accepted, verified, and committed:
 
 - push the branch
 - state clearly if more work is still planned before PR
-- if PR-ready, provide notes in one fenced code block
+- if PR-ready, provide a separate clickable GitHub compare link and notes in one fenced code block for the user to create the PR
+- after the notes, include this brief next-step hint: “After this PR is merged, while still on `<branch-name>`, say `clean workspace` to update `main` and remove the local branch.”
+
+`git push` is downstream of a successful local commit, not a concurrent action.
+
+Keep the GitHub compare link outside the fenced block so it stays clickable and opens the compare page directly. The user creates every PR; do not open, create, submit, or automate a PR through a browser or other tool.
 
 Suggested PR-notes shape:
 
@@ -99,6 +120,12 @@ Verification
 - `npm run verify`
 - Any scoped checks worth mentioning
 ```
+
+When a related commit includes an extended description, the PR-notes `Summary` bullets should mirror those commit-body bullets.
+
+## Post-Merge Workspace Cleanup
+
+For `clean workspace` and equivalent requests, read [workspace-cleanup.md](./workspace-cleanup.md). It is the single source for cleanup checks and deletion boundaries; the delivery review and verification gates above do not apply to cleanup.
 
 ## Lean AGENTS.md Pattern
 
